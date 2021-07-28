@@ -20,19 +20,24 @@ SRC_USERMOD += $(DISPLAY_MOD_DIR)/BSP_DISCO_F469NI/Drivers/BSP/Components/otm800
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/BSP_DISCO_F469NI/Drivers/BSP/STM32469I-Discovery/stm32469i_discovery_ts.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/BSP_DISCO_F469NI/Drivers/BSP/Components/ft6x06/ft6x06.c
 
+# Only STM32 series is currently supported
+ifeq ($(MCU_SERIES),$(filter $(MCU_SERIES),f0 f4 f7 l0 l4 wb))
+
+# Reproduce environment variables from main makefile (not defined at the moment)
+DISPLAY_MPY_DIR = $(USERMOD_DIR)/../../micropython
+DISPLAY_MCU_SERIES_UPPER = $(shell echo $(MCU_SERIES) | tr '[:lower:]' '[:upper:]')
+DISPLAY_HAL_DIR = $(DISPLAY_MPY_DIR)/lib/stm32lib/STM32$(DISPLAY_MCU_SERIES_UPPER)xx_HAL_Driver
+
+else # MCU_SERIES == [f0, f4, f7, l0, l4, wb]
+
+$(error Unsupported platform)
+
+endif # MCU_SERIES == [f0, f4, f7, l0, l4, wb]
+
 # FIXME: this should be included automatically 
 # as these files are in micropython repo as well
 # Probably changes in mpboardconfigport.mk or some #defines can help
-SRC_USERMOD += $(DISPLAY_MOD_DIR)/STM32F4xx_HAL_Driver/stm32f4xx_hal_dsi.c
-SRC_USERMOD += $(DISPLAY_MOD_DIR)/STM32F4xx_HAL_Driver/stm32f4xx_hal_ltdc.c
-SRC_USERMOD += $(DISPLAY_MOD_DIR)/STM32F4xx_HAL_Driver/stm32f4xx_hal_ltdc_ex.c
-SRC_USERMOD += $(DISPLAY_MOD_DIR)/STM32F4xx_HAL_Driver/stm32f4xx_hal_dma2d.c
-
-# lvgl support
-LVGL_DIR := $(DISPLAY_MOD_DIR)
-include $(LVGL_DIR)/lvgl/lvgl.mk
-SRC_USERMOD += $(CSRCS)
-CFLAGS_USERMOD += $(CFLAGS)
+SRC_USERMOD += $(DISPLAY_HAL_DIR)/Src/stm32f4xx_hal_dsi.c
 
 # display driver
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/lv_stm_hal/lv_stm_hal.c
@@ -43,14 +48,10 @@ SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_28.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_22.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_16.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_12.c
-# px_img class
-SRC_USERMOD += $(DISPLAY_MOD_DIR)/pixelart/px_img.c
 
 # Dirs with header files
 CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)
-CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)/lvgl
 CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)/lv_stm_hal
-CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)/pixelart
 CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)/BSP_DISCO_F469NI
 CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)/BSP_DISCO_F469NI/Drivers/BSP/STM32469I-Discovery
 
@@ -65,12 +66,6 @@ SRC_USERMOD += $(DISPLAY_MOD_DIR)/display_unix_sdl.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/lv_sdl_hal/SDL/SDL_monitor.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/lv_sdl_hal/SDL/SDL_mouse.c
 
-# lvgl support
-LVGL_DIR := $(DISPLAY_MOD_DIR)
-include $(LVGL_DIR)/lvgl/lvgl.mk
-SRC_USERMOD += $(CSRCS)
-CFLAGS_USERMOD += $(CFLAGS)
-
 # square font
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/square.c
 # roboto mono font
@@ -78,13 +73,9 @@ SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_28.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_22.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_16.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_12.c
-# px_img class
-SRC_USERMOD += $(DISPLAY_MOD_DIR)/pixelart/px_img.c
 
 # Dirs with header files
 CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)
-CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)/lvgl
-CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)/pixelart
 CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)/lv_sdl_hal/SDL
 
 LDFLAGS_MOD += -lSDL2

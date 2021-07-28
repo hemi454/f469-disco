@@ -2,7 +2,7 @@
 #include "py/obj.h"
 #include "py/runtime.h"
 #include "py/builtin.h"
-#include "lvgl.h"
+#include "lib/lv_bindings/lvgl/lvgl.h"
 #include "lv_stm_hal.h"
 #include "stm32469i_discovery_lcd.h"
 
@@ -72,9 +72,6 @@ const mp_obj_module_t display_user_cmodule = {
     .base = { &mp_type_module },
     .globals = (mp_obj_dict_t*)&display_module_globals,
 };
-
-// #include "lvgl_mpy.c"
-#include "lv_mpy_example.c"
 
 // Register the module to make it available in Python
 MP_REGISTER_MODULE(MP_QSTR_udisplay, display_user_cmodule, MODULE_DISPLAY_ENABLED);

@@ -1,6 +1,6 @@
 #include "lv_stm_hal.h"
 #include "lv_conf.h"
-#include "lvgl/src/lv_hal/lv_hal.h"
+#include "lvgl/src/hal/lv_hal.h"
 #include "stm32469i_discovery_lcd.h"
 #include "stm32469i_discovery_ts.h"
 
@@ -21,14 +21,13 @@ void tft_init(){
     BSP_LCD_Clear(0xFFFFFFFF);
     BSP_LCD_SetBackColor(0xFFFFFFFF);
 
-	// FIXME: try two full-screen buffers in SRAM
-	static lv_color_t disp_buf1[LV_HOR_RES_MAX * 30];
-	static lv_disp_buf_t buf;
-	lv_disp_buf_init(&buf, disp_buf1, NULL, LV_HOR_RES_MAX * 30);
+	lv_disp_drv_t disp_drv;
+
+	disp_drv.ver_res = LV_VER_RES_MAX;
+	disp_drv.hor_res = LV_HOR_RES_MAX;
+
 	lv_disp_drv_init(&disp_drv);
 
-
-	disp_drv.buffer = &buf;
 	disp_drv.flush_cb = tft_flush;
 // #if TFT_USE_GPU != 0
   // DMA2D_Config();
@@ -81,7 +80,7 @@ static void gpu_mem_fill(lv_disp_drv_t * disp_drv, lv_color_t * dest_buf, lv_coo
 
 /**************** touchpad ****************/
 
-static bool touchpad_read(lv_indev_drv_t * drv, lv_indev_data_t *data);
+static void touchpad_read(lv_indev_drv_t * drv, lv_indev_data_t *data);
 static TS_StateTypeDef  TS_State;
 
 void touchpad_init(){
@@ -94,7 +93,7 @@ void touchpad_init(){
   lv_indev_drv_register(&indev_drv);
 }
 
-static bool touchpad_read(lv_indev_drv_t * drv, lv_indev_data_t *data)
+static void touchpad_read(lv_indev_drv_t * drv, lv_indev_data_t *data)
 {
 	static int16_t last_x = 0;
 	static int16_t last_y = 0;
@@ -105,12 +104,10 @@ static bool touchpad_read(lv_indev_drv_t * drv, lv_indev_data_t *data)
 		data->point.y = TS_State.touchY[0];
 		last_x = data->point.x;
 		last_y = data->point.y;
-		data->state = LV_INDEV_STATE_PR;
+		data->state = LV_INDEV_STATE_PRESSED;
 	} else {
 		data->point.x = last_x;
 		data->point.y = last_y;
-		data->state = LV_INDEV_STATE_REL;
+		data->state = LV_INDEV_STATE_RELEASED;
 	}
-
-	return false;
 }

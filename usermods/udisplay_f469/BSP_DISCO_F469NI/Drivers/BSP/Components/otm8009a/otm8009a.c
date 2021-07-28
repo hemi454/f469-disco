@@ -188,7 +188,7 @@ __weak void DSI_IO_WriteCmd(uint32_t NbrParams, uint8_t *pParams)
 /**
   * @brief  Initializes the LCD KoD display part by communication in DSI mode in Video Mode
   *         with IC Display Driver OTM8009A (see IC Driver specification for more information).
-  * @param  hdsi_eval : pointer on DSI configuration structure
+  * @param  hdsi : pointer on DSI configuration structure
   * @param  hdsivideo_handle : pointer on DSI video mode configuration structure
   * @retval Status
   */
