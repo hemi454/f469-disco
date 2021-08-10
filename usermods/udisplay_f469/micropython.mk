@@ -62,9 +62,6 @@ ifneq ($(UNAME_S),)
 
 # The module itself
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/display_unix.c
-SRC_USERMOD += $(DISPLAY_MOD_DIR)/display_unix_sdl.c
-SRC_USERMOD += $(DISPLAY_MOD_DIR)/lv_sdl_hal/SDL/SDL_monitor.c
-SRC_USERMOD += $(DISPLAY_MOD_DIR)/lv_sdl_hal/SDL/SDL_mouse.c
 
 # square font
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/square.c
@@ -76,7 +73,6 @@ SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_12.c
 
 # Dirs with header files
 CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)
-CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)/lv_sdl_hal/SDL
 
 LDFLAGS_MOD += -lSDL2
 
