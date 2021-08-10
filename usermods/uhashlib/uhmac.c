@@ -41,7 +41,7 @@ STATIC mp_obj_t hmac_HMAC_make_new_helper(const mp_obj_type_t *type, size_t n_ar
     }else if(strcmp(digestmodbuf.buf, "sha512") == 0){
         digestmod = DIGEST_HMAC_SHA512;
     }else{
-        mp_raise_ValueError("Unsupported hash type");
+        mp_raise_ValueError(MP_ERROR_TEXT("Unsupported hash type"));
         return mp_const_none;
     }
 

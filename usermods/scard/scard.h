@@ -201,7 +201,7 @@ extern scard_pin_state_t scard_pin_read_debounce(scard_pin_dsc_t* p_pin,
  * @param message  message associated with exception
  */
 static inline void raise_SmartcardException(const char* message) {
-  mp_raise_msg(&mp_type_SmartcardException, message);
+  mp_raise_msg(&mp_type_SmartcardException, MP_ERROR_TEXT(message));
 }
 
 /**
@@ -209,7 +209,7 @@ static inline void raise_SmartcardException(const char* message) {
  * @param message  message associated with exception
  */
 static inline void raise_CardConnectionException(const char* message) {
-  mp_raise_msg(&mp_type_CardConnectionException, message);
+  mp_raise_msg(&mp_type_CardConnectionException, MP_ERROR_TEXT(message));
 }
 
 /**
@@ -217,7 +217,7 @@ static inline void raise_CardConnectionException(const char* message) {
  * @param message  message associated with exception
  */
 static inline void raise_NoCardException(const char* message) {
-  mp_raise_msg(&mp_type_NoCardException, message);
+  mp_raise_msg(&mp_type_NoCardException, MP_ERROR_TEXT(message));
 }
 
 /**

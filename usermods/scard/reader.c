@@ -85,13 +85,13 @@ STATIC mp_obj_t reader_make_new(const mp_obj_type_t* type, size_t n_args,
 
   // Check if given interface exists
   if(!scard_interface_exists(args[ARG_ifaceId].u_obj)) {
-    mp_raise_ValueError("interface does not exists");
+    mp_raise_ValueError(MP_ERROR_TEXT("interface does not exists"));
   }
 
   // Check name
   if( !mp_obj_is_type(args[ARG_name].u_obj, &mp_type_NoneType) &&
       !mp_obj_is_str(args[ARG_name].u_obj) ) {
-    mp_raise_ValueError("name must be string or None");
+    mp_raise_ValueError(MP_ERROR_TEXT("name must be string or None"));
   }
 
   // Create new object

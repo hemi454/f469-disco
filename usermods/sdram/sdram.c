@@ -51,7 +51,7 @@ STATIC mp_obj_t sdram_ramdevice_readblocks(mp_obj_t self_in,
     mp_get_buffer_raise(buf, &buffer, MP_BUFFER_WRITE);
     size_t start = self->start + mp_obj_get_int(block_num)*self->block_size;
     if(start+buffer.len >= SDRAM_END_ADDRESS){
-        mp_raise_ValueError("Outer space...");
+        mp_raise_ValueError(MP_ERROR_TEXT("Outer space..."));
         return mp_const_none;
     }
     memcpy(buffer.buf, (uint8_t *)start, buffer.len);
@@ -66,7 +66,7 @@ STATIC mp_obj_t sdram_ramdevice_writeblocks(mp_obj_t self_in,
     mp_get_buffer_raise(buf, &buffer, MP_BUFFER_READ);
     size_t start = (self->start + mp_obj_get_int(block_num)*self->block_size);
     if(start+buffer.len >= SDRAM_END_ADDRESS){
-        mp_raise_ValueError("Outer space...");
+        mp_raise_ValueError(MP_ERROR_TEXT("Outer space..."));
         return mp_const_none;
     }
     memcpy((uint8_t *)start, buffer.buf, buffer.len);

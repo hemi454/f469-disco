@@ -292,7 +292,7 @@ STATIC mp_obj_t hashlib_pbkdf2_hmac(size_t n_args, const mp_obj_t *args) {
         pbkdf2_hmac_sha512(pwdbuf.buf, pwdbuf.len, saltbuf.buf, saltbuf.len, iter, (byte*)vstr.buf, l);
         return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
     }
-    mp_raise_ValueError("Unsupported hash type");
+    mp_raise_ValueError(MP_ERROR_TEXT("Unsupported hash type"));
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR(hashlib_pbkdf2_hmac_obj, 4, hashlib_pbkdf2_hmac);
@@ -328,7 +328,7 @@ STATIC mp_obj_t hashlib_new(size_t n_args, const mp_obj_t *args) {
     if(strcmp(typebuf.buf, "sha1") == 0){
         return hashlib_sha1_make_new(&hashlib_sha1_type, n_args-1, 0, args+1);
     }
-    mp_raise_ValueError("Unsupported hash type");
+    mp_raise_ValueError(MP_ERROR_TEXT("Unsupported hash type"));
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR(hashlib_new_obj, 1, hashlib_new);

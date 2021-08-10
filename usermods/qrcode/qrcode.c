@@ -16,7 +16,7 @@ STATIC mp_obj_t qrcode_encode(mp_obj_t text_obj){
     bool ok = qrcodegen_encodeText(bufinfo.buf, tempBuffer, qrcode, errCorLvl,
         qrcodegen_VERSION_MIN, qrcodegen_VERSION_MAX, qrcodegen_Mask_AUTO, true);
     if(!ok){
-        mp_raise_ValueError("Failed to encode");
+        mp_raise_ValueError(MP_ERROR_TEXT("Failed to encode"));
     }
     int size = qrcodegen_getSize(qrcode);
     // align to 8 bits and add 2-block border
@@ -55,7 +55,7 @@ STATIC mp_obj_t qrcode_encode_to_string(mp_obj_t text_obj){
     bool ok = qrcodegen_encodeText(bufinfo.buf, tempBuffer, qrcode, errCorLvl,
         qrcodegen_VERSION_MIN, qrcodegen_VERSION_MAX, qrcodegen_Mask_AUTO, true);
     if(!ok){
-        mp_raise_ValueError("Failed to encode");
+        mp_raise_ValueError(MP_ERROR_TEXT("Failed to encode"));
     }
     int size = qrcodegen_getSize(qrcode);
     size_t bufsize = (size+1)*size;

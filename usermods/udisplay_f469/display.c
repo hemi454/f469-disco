@@ -38,7 +38,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_0(display_off_obj, display_off);
 STATIC mp_obj_t display_set_rotation(mp_obj_t rot_obj){
     int rot_int = mp_obj_get_int(rot_obj);
     if(rot_int < 0 || rot_int > 1){
-        mp_raise_ValueError("Rotation can be 0 or 1");
+        mp_raise_ValueError(MP_ERROR_TEXT("Rotation can be 0 or 1"));
         return mp_const_none;
     }
     LCD_OrientationTypeDef rot = LCD_ORIENTATION_PORTRAIT;

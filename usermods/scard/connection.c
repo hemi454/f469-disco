@@ -515,7 +515,7 @@ static void connection_init(connection_obj_t* self,
   } else if(mp_obj_is_int(params->timer_id)) {
     self->timer = create_timer(self, mp_obj_get_int(params->timer_id));
   } else {
-    mp_raise_TypeError("timer_id must be integer or None");
+    mp_raise_TypeError(MP_ERROR_TEXT("timer_id must be integer or None"));
   }
 
   // Make connection alive
@@ -763,7 +763,7 @@ STATIC mp_obj_t connection_setBlocking(mp_obj_t self_in, mp_obj_t blocking_in) {
   bool blocking  = mp_obj_is_true(blocking_in);
 
   if(!blocking && MP_OBJ_NULL == self->timer) {
-    mp_raise_ValueError("no timer for non-blocking operation");
+    mp_raise_ValueError(MP_ERROR_TEXT("no timer for non-blocking operation"));
   }
   self->blocking = blocking;
   return mp_const_none;
@@ -960,7 +960,7 @@ STATIC mp_obj_t connection_transmit(size_t n_args, const mp_obj_t *pos_args,
     }
     // Convert list to a buffer of bytes
     if(!objects_to_buf(bufinfo.buf, items, bufinfo.len)) {
-      mp_raise_ValueError("incorrect data format");
+      mp_raise_ValueError(MP_ERROR_TEXT("incorrect data format"));
     }
   } else { // 'bytes' is bytes array or anything supporting buffer protocol
     mp_get_buffer_raise(args[ARG_bytes].u_obj, &bufinfo, MP_BUFFER_READ);
@@ -1124,7 +1124,7 @@ STATIC mp_obj_t connection_addObserver(mp_obj_t self_in, mp_obj_t observer) {
   connection_obj_t* self = (connection_obj_t*)self_in;
 
   if(!mp_obj_is_callable(observer)) {
-    mp_raise_TypeError("observer must be callable");
+    mp_raise_TypeError(MP_ERROR_TEXT("observer must be callable"));
   }
   (void)mp_obj_list_append(self->observers, observer);
 
@@ -1146,7 +1146,7 @@ STATIC mp_obj_t connection_deleteObserver(mp_obj_t self_in, mp_obj_t observer) {
   connection_obj_t* self = (connection_obj_t*)self_in;
 
   if(!mp_obj_is_callable(observer)) {
-    mp_raise_TypeError("observer must be callable");
+    mp_raise_TypeError(MP_ERROR_TEXT("observer must be callable"));
   }
   (void)mp_obj_list_remove(self->observers, observer);
 

@@ -10,7 +10,7 @@
 STATIC mp_obj_t bip39_wordlist_get(mp_obj_t index_obj){
     mp_int_t idx = mp_obj_get_int(index_obj);
     if(idx < 0 || idx >= WORDLIST_BIP39_LENGTH){
-        mp_raise_ValueError("Invalid index");
+        mp_raise_ValueError(MP_ERROR_TEXT("Invalid index"));
         return mp_const_none;
     }
     const char * word = wordlist_bip39_english[idx];
@@ -55,7 +55,7 @@ const mp_obj_module_t uembit_bip39_wordlist_module = {
 STATIC mp_obj_t slip39_wordlist_get(mp_obj_t index_obj){
     mp_int_t idx = mp_obj_get_int(index_obj);
     if(idx < 0 || idx >= WORDLIST_SLIP39_LENGTH){
-        mp_raise_ValueError("Invalid index");
+        mp_raise_ValueError(MP_ERROR_TEXT("Invalid index"));
         return mp_const_none;
     }
     const char * word = wordlist_slip39_english[idx];
