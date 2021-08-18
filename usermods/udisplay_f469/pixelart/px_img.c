@@ -14,12 +14,12 @@
 #error "px_img: lv_label is required. Enable it in lv_conf.h (LV_USE_LABEL  1) "
 #endif
 
-#include "../lvgl/src/lv_themes/lv_theme.h"
-#include "../lvgl/src/lv_draw/lv_img_decoder.h"
-#include "../lvgl/src/lv_misc/lv_fs.h"
-#include "../lvgl/src/lv_misc/lv_txt.h"
-#include "../lvgl/src/lv_misc/lv_log.h"
-#include "../lvgl/src/lv_objx/lv_img.h"
+#include "../../lib/lv_bindings/lvgl/src/lv_themes/lv_theme.h"
+#include "../../lib/lv_bindings/lvgl/src/lv_draw/lv_img_decoder.h"
+#include "../../lib/lv_bindings/lvgl/src/lv_misc/lv_fs.h"
+#include "../../lib/lv_bindings/lvgl/src/lv_misc/lv_txt.h"
+#include "../../lib/lv_bindings/lvgl/src/lv_misc/lv_log.h"
+#include "../../lib/lv_bindings/lvgl/src/lv_widgets/lv_img.h"
 
 /*********************
  *      DEFINES
@@ -32,7 +32,7 @@
 /**********************
  *  STATIC PROTOTYPES
  **********************/
-static bool px_img_design(lv_obj_t * img, const lv_area_t * mask, lv_design_mode_t mode);
+static lv_res_t px_img_design(lv_obj_t * img, const lv_area_t * mask, lv_design_mode_t mode);
 static lv_res_t px_img_signal(lv_obj_t * img, lv_signal_t sign, void * param);
 
 /**********************
@@ -62,14 +62,12 @@ lv_obj_t * px_img_create(lv_obj_t * par, const lv_obj_t * copy)
 
     /*Create a basic object*/
     new_img = lv_obj_create(par, copy);
-    lv_mem_assert(new_img);
     if(new_img == NULL) return NULL;
 
     if(ancestor_signal == NULL) ancestor_signal = lv_obj_get_signal_cb(new_img);
 
     /*Extend the basic object to image object*/
     lv_img_ext_t * ext = lv_obj_allocate_ext_attr(new_img, sizeof(lv_img_ext_t));
-    lv_mem_assert(ext);
     if(ext == NULL) return NULL;
 
     ext->src       = NULL;
@@ -92,10 +90,12 @@ lv_obj_t * px_img_create(lv_obj_t * par, const lv_obj_t * copy)
          * and must be screen sized*/
         if(par != NULL) {
             ext->auto_size = 0;
-            lv_obj_set_style(new_img, NULL); /*Inherit the style  by default*/
+            lv_obj_add_style(new_img, LV_OBJ_PART_MAIN, NULL); /*Inherit the style  by default*/
         } else {
             ext->auto_size = 0;
-            lv_obj_set_style(new_img, &lv_style_plain); /*Set a style for screens*/
+            lv_style_t lv_style_plain;
+            lv_style_init(&lv_style_plain);
+            lv_obj_add_style(new_img, LV_OBJ_PART_MAIN, &lv_style_plain); /*Set a style for screens*/
         }
     } else {
         lv_img_ext_t * copy_ext = lv_obj_get_ext_attr(copy);
@@ -103,7 +103,7 @@ lv_obj_t * px_img_create(lv_obj_t * par, const lv_obj_t * copy)
         lv_img_set_src(new_img, copy_ext->src);
 
         /*Refresh the style with new signal function*/
-        lv_obj_refresh_style(new_img);
+        lv_obj_refresh_style(new_img, LV_OBJ_PART_MAIN, LV_STYLE_PROP_ALL);
     }
 
     LV_LOG_INFO("image created");
@@ -111,9 +111,9 @@ lv_obj_t * px_img_create(lv_obj_t * par, const lv_obj_t * copy)
     return new_img;
 }
 
-static bool px_img_design(lv_obj_t * img, const lv_area_t * mask, lv_design_mode_t mode)
+static lv_res_t px_img_design(lv_obj_t * img, const lv_area_t * mask, lv_design_mode_t mode)
 {
-    const lv_style_t * style = lv_obj_get_style(img);
+    const lv_style_t * style = lv_obj_get_local_style(img, LV_OBJ_PART_MAIN);
     lv_img_ext_t * ext       = lv_obj_get_ext_attr(img);
     lv_img_dsc_t * dsc = (lv_img_dsc_t *)ext->src;
 
@@ -121,13 +121,13 @@ static bool px_img_design(lv_obj_t * img, const lv_area_t * mask, lv_design_mode
         bool cover = false;
         if(ext->src_type == LV_IMG_SRC_UNKNOWN || ext->src_type == LV_IMG_SRC_SYMBOL) return false;
 
-        if(ext->cf == LV_IMG_CF_TRUE_COLOR || ext->cf == LV_IMG_CF_RAW) cover = lv_area_is_in(mask, &img->coords);
+        if(ext->cf == LV_IMG_CF_TRUE_COLOR || ext->cf == LV_IMG_CF_RAW) cover = _lv_area_is_in(mask, &img->coords, 0);
 
         return cover;
     } else if(mode == LV_DESIGN_DRAW_MAIN) {
         if(ext->h == 0 || ext->w == 0) return true;
         lv_area_t coords;
-        lv_opa_t opa_scale = lv_obj_get_opa_scale(img);
+        lv_opa_t opa_scale = _lv_obj_get_style_opa(img, LV_OBJ_PART_MAIN, LV_STYLE_BORDER_OPA);
 
         lv_obj_get_coords(img, &coords);
 
@@ -149,8 +149,6 @@ static bool px_img_design(lv_obj_t * img, const lv_area_t * mask, lv_design_mode
         cords_tmp.y2 = coords.y1 + w;
         cords_tmp.x2 = coords.x1 + w;
 
-        // lv_draw_fill(&cords_tmp, mask, LV_COLOR_MAKE(255,255,255), opa_scale);
-
         uint16_t idx = 0;
         const uint8_t * data = (uint8_t *)dsc->data;
         for(lv_coord_t x = 0; x < ww; x++){
@@ -163,14 +161,14 @@ static bool px_img_design(lv_obj_t * img, const lv_area_t * mask, lv_design_mode
                 uint8_t b = data[idx/8];
                 uint8_t s = 7-(idx % 8);
                 if((b>>s)&1){
-                    lv_draw_fill(&cords_tmp, mask, LV_COLOR_MAKE(0,0,0), opa_scale);            
+                    ///lv_draw_fill(&cords_tmp, mask, LV_COLOR_MAKE(0,0,0), opa_scale);            
                 }
             }
         }
 
     }
 
-    return true;
+    return LV_RES_OK;
 }
 
 /**

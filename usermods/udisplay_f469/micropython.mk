@@ -48,10 +48,13 @@ SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_28.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_22.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_16.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_12.c
+# px_img class
+SRC_USERMOD += $(DISPLAY_MOD_DIR)/pixelart/px_img.c
 
 # Dirs with header files
 CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)
 CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)/lv_stm_hal
+CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)/pixelart
 CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)/BSP_DISCO_F469NI
 CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)/BSP_DISCO_F469NI/Drivers/BSP/STM32469I-Discovery
 
@@ -70,9 +73,12 @@ SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_28.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_22.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_16.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_12.c
+# px_img class
+SRC_USERMOD += $(DISPLAY_MOD_DIR)/pixelart/px_img.c
 
 # Dirs with header files
 CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)
+CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)/pixelart
 
 LDFLAGS_MOD += -lSDL2
 
