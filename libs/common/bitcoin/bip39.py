@@ -12,7 +12,7 @@ from .wordlists.bip39 import WORDLIST
 PBKDF2_ROUNDS = const(2048)
 
 
-def mnemonic_to_bytes(mnemonic: str, ignore_checksum=False):
+def mnemonic_to_bytes(mnemonic: str, ignore_checksum=False, wordlist=WORDLIST):
     # this function is copied from Jimmy Song's HDPrivateKey.from_mnemonic() method
 
     words = mnemonic.strip().split()
@@ -22,9 +22,9 @@ def mnemonic_to_bytes(mnemonic: str, ignore_checksum=False):
     binary_seed = bytearray()
     offset = 0
     for word in words:
-        if word not in WORDLIST:
+        if word not in wordlist:
             raise ValueError("Word '%s' is not in the dictionary" % word)
-        index = WORDLIST.index(word)
+        index = wordlist.index(word)
         remaining = 11
         while remaining > 0:
             bits_needed = 8 - offset
@@ -68,19 +68,21 @@ def mnemonic_to_bytes(mnemonic: str, ignore_checksum=False):
     return data
 
 
-def mnemonic_is_valid(mnemonic: str):
+def mnemonic_is_valid(mnemonic: str, wordlist=WORDLIST):
     """Checks if mnemonic is valid (checksum and words)"""
     try:
-        mnemonic_to_bytes(mnemonic)
+        mnemonic_to_bytes(mnemonic, wordlist=wordlist)
         return True
-    except:
+    except Exception as e:
         return False
 
 
-def mnemonic_to_seed(mnemonic: str, password: str = ""):
-    # first we try to conver mnemonic to bytes
+def mnemonic_to_seed(mnemonic: str, password: str = "", wordlist=WORDLIST):
+    # first we try to convert mnemonic to bytes
     # and raise a correct error if it is invalid
-    mnemonic_to_bytes(mnemonic)
+    # If wordlist is None - don't check mnemonic.
+    if wordlist is not None:
+        mnemonic_to_bytes(mnemonic, wordlist=wordlist)
     return hashlib.pbkdf2_hmac(
         "sha512",
         mnemonic.encode("utf-8"),
@@ -99,25 +101,25 @@ def _extract_index(bits, b, n):
     return value
 
 
-def mnemonic_from_bytes(b):
-    if len(b) % 4 != 0:
+def mnemonic_from_bytes(entropy, wordlist=WORDLIST):
+    if len(entropy) % 4 != 0:
         raise ValueError("Byte array should be multiple of 4 long (16, 20, ..., 32)")
-    total_bits = len(b) * 8
+    total_bits = len(entropy) * 8
     checksum_bits = total_bits // 32
     total_mnemonics = (total_bits + checksum_bits) // 11
     # no need to truncate checksum - we already know total_mnemonics
-    checksum = bytearray(hashlib.sha256(b).digest())
-    b += checksum
+    checksum = bytearray(hashlib.sha256(entropy).digest())
+    entropy += checksum
     mnemonic = []
     for i in range(0, total_mnemonics):
-        idx = _extract_index(11, b, i)
-        mnemonic.append(WORDLIST[idx])
+        idx = _extract_index(11, entropy, i)
+        mnemonic.append(wordlist[idx])
     return " ".join(mnemonic)
 
 
-def find_candidates(word_part, nmax=5):
+def find_candidates(word_part, nmax=5, wordlist=WORDLIST):
     candidates = []
-    for w in WORDLIST:
+    for w in wordlist:
         if w.startswith(word_part):
             candidates.append(w)
         if len(candidates) >= nmax:
