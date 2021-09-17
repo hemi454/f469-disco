@@ -7,7 +7,7 @@ class QRCode(lv.img):
     def set_text(self, text="Text"):
         self._text = text
 
-        raw = qrcode.encode(text)
+        raw = qrcode.encode(text, 10)
         size = int(math.sqrt(len(raw)*8))
         buf = bytearray(raw)
     
