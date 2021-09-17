@@ -42,4 +42,4 @@ def init(autoupdate=True):
     lv.scr_load(scr)
     if autoupdate:
         import SDL
-        SDL.enable_autoupdate()
+        SDL.refresh()
