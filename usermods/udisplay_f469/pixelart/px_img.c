@@ -90,12 +90,12 @@ lv_obj_t * px_img_create(lv_obj_t * par, const lv_obj_t * copy)
          * and must be screen sized*/
         if(par != NULL) {
             ext->auto_size = 0;
-            lv_obj_add_style(new_img, LV_OBJ_PART_MAIN, NULL); /*Inherit the style  by default*/
+            lv_obj_add_style(new_img, LV_IMG_PART_MAIN, NULL); /*Inherit the style  by default*/
         } else {
-            ext->auto_size = 0;
-            lv_style_t lv_style_plain;
+            static lv_style_t lv_style_plain;
             lv_style_init(&lv_style_plain);
-            lv_obj_add_style(new_img, LV_OBJ_PART_MAIN, &lv_style_plain); /*Set a style for screens*/
+            ext->auto_size = 0;
+            lv_obj_add_style(new_img, LV_IMG_PART_MAIN, &lv_style_plain); /*Set a style for screens*/
         }
     } else {
         lv_img_ext_t * copy_ext = lv_obj_get_ext_attr(copy);
@@ -103,7 +103,7 @@ lv_obj_t * px_img_create(lv_obj_t * par, const lv_obj_t * copy)
         lv_img_set_src(new_img, copy_ext->src);
 
         /*Refresh the style with new signal function*/
-        lv_obj_refresh_style(new_img, LV_OBJ_PART_MAIN, LV_STYLE_PROP_ALL);
+        lv_obj_refresh_style(new_img, LV_IMG_PART_MAIN, LV_STYLE_PROP_ALL);
     }
 
     LV_LOG_INFO("image created");
@@ -113,7 +113,6 @@ lv_obj_t * px_img_create(lv_obj_t * par, const lv_obj_t * copy)
 
 static lv_res_t px_img_design(lv_obj_t * img, const lv_area_t * mask, lv_design_mode_t mode)
 {
-    const lv_style_t * style = lv_obj_get_local_style(img, LV_OBJ_PART_MAIN);
     lv_img_ext_t * ext       = lv_obj_get_ext_attr(img);
     lv_img_dsc_t * dsc = (lv_img_dsc_t *)ext->src;
 
@@ -127,7 +126,7 @@ static lv_res_t px_img_design(lv_obj_t * img, const lv_area_t * mask, lv_design_
     } else if(mode == LV_DESIGN_DRAW_MAIN) {
         if(ext->h == 0 || ext->w == 0) return true;
         lv_area_t coords;
-        lv_opa_t opa_scale = _lv_obj_get_style_opa(img, LV_OBJ_PART_MAIN, LV_STYLE_BORDER_OPA);
+        lv_opa_t opa_scale = lv_obj_get_style_opa_scale(img, LV_IMG_PART_MAIN);
 
         lv_obj_get_coords(img, &coords);
 
@@ -161,7 +160,8 @@ static lv_res_t px_img_design(lv_obj_t * img, const lv_area_t * mask, lv_design_
                 uint8_t b = data[idx/8];
                 uint8_t s = 7-(idx % 8);
                 if((b>>s)&1){
-                    ///lv_draw_fill(&cords_tmp, mask, LV_COLOR_MAKE(0,0,0), opa_scale);            
+                    // lv_draw_fill(&cords_tmp, mask, LV_COLOR_MAKE(0,0,0), opa_scale);            
+                    // lv_draw_img(&cords_tmp, mask, dsc->data, NULL);         
                 }
             }
         }

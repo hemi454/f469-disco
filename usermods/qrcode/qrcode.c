@@ -5,9 +5,14 @@
 #include "qrcodegen.h"
 #include "string.h"
 
-STATIC mp_obj_t qrcode_encode(mp_obj_t text_obj){
+STATIC mp_obj_t qrcode_encode(mp_uint_t n_args, const mp_obj_t *args){
     mp_buffer_info_t bufinfo;
-    mp_get_buffer_raise(text_obj, &bufinfo, MP_BUFFER_READ);
+    mp_get_buffer_raise(args[0], &bufinfo, MP_BUFFER_READ);
+
+    int scale = 1;
+    if(n_args>1){
+        scale = mp_obj_get_int(args[1]);
+    }
 
     enum qrcodegen_Ecc errCorLvl = qrcodegen_Ecc_LOW;  // Error correction level
     
@@ -19,29 +24,33 @@ STATIC mp_obj_t qrcode_encode(mp_obj_t text_obj){
         mp_raise_ValueError(MP_ERROR_TEXT("Failed to encode"));
     }
     int size = qrcodegen_getSize(qrcode);
-    // align to 8 bits and add 2-block border
-    int imgsize = (size/8+1)*8+4;
+    // align to 8 bits and add 4-block border
+    int imgsize = ((size/8+1)*8+8);
     int lpad = (imgsize-size)/2;
-    size_t bufsize = (imgsize*imgsize)/8;
+    size_t bufsize = (imgsize*imgsize*scale*scale)/8;
     vstr_t vstr;
     vstr_init_len(&vstr, bufsize);
     memset((byte*)vstr.buf, 0, bufsize);
-    size_t cur = imgsize*lpad;
+    size_t cur = imgsize*lpad*scale;
     for(int y=0; y<imgsize-lpad; y++){
-        cur+=lpad;
-        for(int x=0; x<imgsize-lpad; x++){
-            vstr.buf[cur/8] = vstr.buf[cur/8] << 1;
-            if(x<size && y<size){
-                if(qrcodegen_getModule(qrcode, x, y)){
-                    vstr.buf[cur/8]++;
+        for(int ys=0; ys<scale; ys++){
+            cur+=lpad*scale;
+            for(int x=0; x<imgsize-lpad; x++){
+                for(int xs=0; xs<scale; xs++){
+                    vstr.buf[cur/8] = vstr.buf[cur/8] << 1;
+                    if(x<size && y<size){
+                        if(qrcodegen_getModule(qrcode, x, y)){
+                            vstr.buf[cur/8]++;
+                        }
+                    }
+                    cur++;
                 }
             }
-            cur++;
         }
     }
     return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(qrcode_encode_obj, qrcode_encode);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR(qrcode_encode_obj, 1, qrcode_encode);
 
 
 STATIC mp_obj_t qrcode_encode_to_string(mp_obj_t text_obj){
