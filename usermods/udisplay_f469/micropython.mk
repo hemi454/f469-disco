@@ -41,15 +41,12 @@ SRC_USERMOD += $(DISPLAY_HAL_DIR)/Src/stm32f4xx_hal_dsi.c
 
 # display driver
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/lv_stm_hal/lv_stm_hal.c
-# square font
-SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/square.c
+
 # roboto mono font
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_28.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_22.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_16.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_12.c
-# px_img class
-SRC_USERMOD += $(DISPLAY_MOD_DIR)/pixelart/px_img.c
 
 # Dirs with header files
 CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)
@@ -65,15 +62,11 @@ ifneq ($(UNAME_S),)
 # The module itself
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/display_unix.c
 
-# square font
-SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/square.c
 # roboto mono font
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_28.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_22.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_16.c
 SRC_USERMOD += $(DISPLAY_MOD_DIR)/fonts/font_roboto_mono_12.c
-# px_img class
-SRC_USERMOD += $(DISPLAY_MOD_DIR)/pixelart/px_img.c
 
 # Dirs with header files
 CFLAGS_USERMOD += -I$(DISPLAY_MOD_DIR)
