@@ -1002,15 +1002,16 @@ static event_t send_ifsd_request(t1_inst_t* inst) {
  * @return      event or empty event with event_t::code = t1_ev_none
  */
 static event_t send_block_if_available(t1_inst_t* inst) {
+  event_t result = event_none;
   if(t1_st_error != inst->fsm_state) {
     if(tx_fifo_has_block(inst)) {
       inst->fsm_state = t1_st_wait_response;
-      return tx_fifo_send_last_block(inst);
+      result = tx_fifo_send_last_block(inst);
     } else {
       inst->fsm_state = t1_st_idle;
-      return event_none;
     }
   }
+  return result;
 }
 
 /**
@@ -1025,7 +1026,7 @@ static bool check_pps_response(t1_inst_t* inst, const uint8_t* buf,
   if( pps_size == size &&
       PPSS == buf[pps_ppss] &&
       atr_prot_t1 == buf[pps_pps0] &&
-      0U == buf[pps_ppss] ^ buf[pps_pps0] ^ buf[pps_pck ] ) {
+      0U == (buf[pps_ppss] ^ buf[pps_pps0] ^ buf[pps_pck]) ) {
     return true;
   }
   return false;

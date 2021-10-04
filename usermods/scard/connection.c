@@ -331,6 +331,10 @@ static void proto_cb_handle_event(mp_obj_t self_in, proto_ev_code_t ev_code,
         raise_SmartcardException(prm.error);
       }
       break;
+
+      default:
+      break;
+
   }
 }
 
@@ -929,10 +933,10 @@ STATIC mp_obj_t connection_transmit(size_t n_args, const mp_obj_t *pos_args,
   // Change smart card protocol if requested
   mp_int_t new_protocol = self->next_protocol;
   self->next_protocol = protocol_na;
-  //__TODO__
-  // if(!mp_obj_is_type(args[ARG_protocol].u_obj, &mp_type_NoneType)) {
-  //   new_protocol = mp_obj_get_int(args[ARG_protocol].u_obj);
-  // }
+  // __TODO__
+  if(!mp_obj_is_type(args[ARG_protocol].u_obj, &mp_type_NoneType)) {
+    new_protocol = mp_obj_get_int(args[ARG_protocol].u_obj);
+  }
   if(new_protocol != protocol_na) {
     change_protocol(self, new_protocol, false, false);
   }
@@ -1290,7 +1294,7 @@ STATIC void connection_print(const mp_print_t *print, mp_obj_t self_in,
 
   mp_print_str(print, "<CardConnection at '");
   scard_interface_print(print, self->sc_handle);
-  printf( "' inserted=%b, state='%q', protocol='%s', blocking=%b, observers=%u>",
+  printf( "' inserted=%d, state='%u', protocol='%s', blocking=%d, observers=%u>",
           card_present(self),
           (qstr)self->state,
           self->protocol ? self->protocol->name : "None",
