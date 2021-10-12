@@ -30,8 +30,8 @@ empty: $(TARGET_DIR) mpy-cross $(MPY_DIR)/ports/stm32
 		FROZEN_MANIFEST=$(FROZEN_MANIFEST) \
 		DEBUG=$(DEBUG) && \
 	arm-none-eabi-objcopy -O binary \
-		$(MPY_DIR)/ports/stm32/build-STM32F469DISC/firmware.elf \
-		$(TARGET_DIR)/upy-f469disco-empty.bin
+		$(MPY_DIR)/ports/stm32/build-$(BOARD)/firmware.elf \
+		$(TARGET_DIR)/upy-$(BOARD)-empty.bin
 
 # disco board with bitcoin library
 disco: $(TARGET_DIR) mpy-cross $(MPY_DIR)/ports/stm32
@@ -42,8 +42,8 @@ disco: $(TARGET_DIR) mpy-cross $(MPY_DIR)/ports/stm32
 		FROZEN_MANIFEST=$(FROZEN_MANIFEST_FULL) \
 		DEBUG=$(DEBUG) && \
 	arm-none-eabi-objcopy -O binary \
-		$(MPY_DIR)/ports/stm32/build-STM32F469DISC/firmware.elf \
-		$(TARGET_DIR)/upy-f469disco.bin
+		$(MPY_DIR)/ports/stm32/build-$(BOARD)/firmware.elf \
+		$(TARGET_DIR)/upy-$(BOARD).bin
 
 # unixport (simulator)
 unix: $(TARGET_DIR) mpy-cross $(MPY_DIR)/ports/unix
