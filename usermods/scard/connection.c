@@ -933,7 +933,7 @@ STATIC mp_obj_t connection_transmit(size_t n_args, const mp_obj_t *pos_args,
   // Change smart card protocol if requested
   mp_int_t new_protocol = self->next_protocol;
   self->next_protocol = protocol_na;
-  if(!mp_obj_is_type(args[ARG_protocol].u_obj, &mp_type_NoneType)) {
+  if(args[ARG_protocol].u_obj != mp_const_none) {
     new_protocol = mp_obj_get_int(args[ARG_protocol].u_obj);
   }
   if(new_protocol != protocol_na) {
