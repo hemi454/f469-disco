@@ -4,6 +4,3 @@
 [submodule "usermods/secp256k1"]
 	path = usermods/secp256k1
 	url = https://github.com/sidorenkom/secp256k1-embedded.git
-[submodule "usermods/qrcode/qrdecoder"]
-	path = usermods/qrcode/qrdecoder
-	url = https://github.com/dlbeer/quirc.git
