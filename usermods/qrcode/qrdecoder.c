@@ -3,99 +3,135 @@
 #include "py/runtime.h"
 #include "py/builtin.h"
 #include "quirc.h"
+#include <math.h>
+#include <string.h>
 
+extern uint8_t img_qr_sidorenko_2_map[];
 
-// STATIC mp_obj_t qrcode_encode(mp_uint_t n_args, const mp_obj_t *args){
-//     mp_buffer_info_t bufinfo;
-//     mp_get_buffer_raise(args[0], &bufinfo, MP_BUFFER_READ);
+static struct quirc *qr;
+static uint8_t *image;
+static struct quirc_code code;
+static struct quirc_data data;
 
-//     int scale = 1;
-//     if(n_args>1){
-//         scale = mp_obj_get_int(args[1]);
-//     }
+static struct quirc_data *qrdecoder_quirc_decoder(const uint8_t *img, const uint32_t img_len)
+{
+    struct quirc_data *result = NULL;
 
-//     enum qrcodegen_Ecc errCorLvl = qrcodegen_Ecc_LOW;  // Error correction level
-    
-//     uint8_t qrcode[qrcodegen_BUFFER_LEN_MAX];
-//     uint8_t tempBuffer[qrcodegen_BUFFER_LEN_MAX];
-//     bool ok = qrcodegen_encodeText(bufinfo.buf, tempBuffer, qrcode, errCorLvl,
-//         qrcodegen_VERSION_MIN, qrcodegen_VERSION_MAX, qrcodegen_Mask_AUTO, true);
-//     if(!ok){
-//         mp_raise_ValueError(MP_ERROR_TEXT("Failed to encode"));
-//     }
-//     int size = qrcodegen_getSize(qrcode);
-//     // align to 8 bits and add 4-block border
-//     int imgsize = ((size/8+1)*8+8);
-//     int lpad = (imgsize-size)/2;
-//     size_t bufsize = (imgsize*imgsize*scale*scale)/8;
-//     vstr_t vstr;
-//     vstr_init_len(&vstr, bufsize);
-//     memset((byte*)vstr.buf, 0, bufsize);
-//     size_t cur = imgsize*lpad*scale;
-//     for(int y=0; y<imgsize-lpad; y++){
-//         for(int ys=0; ys<scale; ys++){
-//             cur+=lpad*scale;
-//             for(int x=0; x<imgsize-lpad; x++){
-//                 for(int xs=0; xs<scale; xs++){
-//                     vstr.buf[cur/8] = vstr.buf[cur/8] << 1;
-//                     if(x<size && y<size){
-//                         if(qrcodegen_getModule(qrcode, x, y)){
-//                             vstr.buf[cur/8]++;
-//                         }
-//                     }
-//                     cur++;
-//                 }
-//             }
-//         }
-//     }
-//     return mp_obj_new_str_from_vstr(&mp_type_bytes, &vstr);
-// }
-// STATIC MP_DEFINE_CONST_FUN_OBJ_VAR(qrcode_encode_obj, 1, qrcode_encode);
+    qr = quirc_new();
 
+    if (!qr)
+    {
+        mp_raise_ValueError(MP_ERROR_TEXT("QUIRC: Failed to allocate memory"));
+    }
+    else
+    {
+        int size = (int)sqrt(img_len);
 
-// STATIC mp_obj_t qrcode_encode_to_string(mp_obj_t text_obj){
-//     mp_buffer_info_t bufinfo;
-//     mp_get_buffer_raise(text_obj, &bufinfo, MP_BUFFER_READ);
+        if (size > 0)
+        {
+            if (quirc_resize(qr, size, size) < 0)
+            {
+                mp_raise_ValueError(MP_ERROR_TEXT("QUIRC: Failed to allocate video memory"));
+            }
+            else
+            {
+                int w, h, num_codes;
 
-//     enum qrcodegen_Ecc errCorLvl = qrcodegen_Ecc_LOW;  // Error correction level
-    
-//     uint8_t qrcode[qrcodegen_BUFFER_LEN_MAX];
-//     uint8_t tempBuffer[qrcodegen_BUFFER_LEN_MAX];
-//     bool ok = qrcodegen_encodeText(bufinfo.buf, tempBuffer, qrcode, errCorLvl,
-//         qrcodegen_VERSION_MIN, qrcodegen_VERSION_MAX, qrcodegen_Mask_AUTO, true);
-//     if(!ok){
-//         mp_raise_ValueError(MP_ERROR_TEXT("Failed to encode"));
-//     }
-//     int size = qrcodegen_getSize(qrcode);
-//     size_t bufsize = (size+1)*size;
-//     vstr_t vstr;
-//     vstr_init_len(&vstr, bufsize);
-//     memset((byte*)vstr.buf, '0', bufsize);
-//     for(int y=0; y<size; y++){
-//         for(int x=0; x<size; x++){
-//             if(qrcodegen_getModule(qrcode, x, y)){
-//                 vstr.buf[y*(size+1)+x]='1';
-//             }
-//         }
-//         vstr.buf[y*(size+1)+size]='\n';
-//     }
-//     return mp_obj_new_str_from_vstr(&mp_type_str, &vstr);
-// }
-// STATIC MP_DEFINE_CONST_FUN_OBJ_1(qrcode_encode_to_string_obj, qrcode_encode_to_string);
-// /****************************** MODULE ******************************/
+                image = quirc_begin(qr, &w, &h);
 
-// STATIC const mp_rom_map_elem_t qrcode_module_globals_table[] = {
-//     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_qrcode) },
-//     { MP_ROM_QSTR(MP_QSTR_encode), MP_ROM_PTR(&qrcode_encode_obj) },
-//     { MP_ROM_QSTR(MP_QSTR_encode_to_string), MP_ROM_PTR(&qrcode_encode_to_string_obj) },
-// };
-// STATIC MP_DEFINE_CONST_DICT(qrcode_module_globals, qrcode_module_globals_table);
+                memcpy(image, img, img_len);
 
-// // Define module object.
-// const mp_obj_module_t qrcode_user_cmodule = {
-//     .base = { &mp_type_module },
-//     .globals = (mp_obj_dict_t*)&qrcode_module_globals,
-// };
+                quirc_end(qr);
 
-// // Register the module to make it available in Python
-// MP_REGISTER_MODULE(MP_QSTR_qrcode, qrcode_user_cmodule, MODULE_QRCODE_ENABLED);
+                num_codes = quirc_count(qr);
+
+                for (int i = 0; i < num_codes; i++)
+                {
+                    quirc_extract(qr, i, &code);
+
+                    /* Decoding stage */
+                    switch (quirc_decode(&code, &data))
+                    {
+                    case QUIRC_ERROR_INVALID_GRID_SIZE:
+                    {
+                        mp_raise_ValueError(MP_ERROR_TEXT("QUIRC: Invalid grid size"));
+                        break;
+                    }
+                    case QUIRC_ERROR_INVALID_VERSION:
+                    {
+                        mp_raise_ValueError(MP_ERROR_TEXT("QUIRC: Invalid version"));
+                        break;
+                    }
+                    case QUIRC_ERROR_FORMAT_ECC:
+                    {
+                        mp_raise_ValueError(MP_ERROR_TEXT("QUIRC: Format data ECC failure"));
+                        break;
+                    }
+                    case QUIRC_ERROR_DATA_ECC:
+                    {
+                        mp_raise_ValueError(MP_ERROR_TEXT("QUIRC: ECC failure"));
+                        break;
+                    }
+                    case QUIRC_ERROR_UNKNOWN_DATA_TYPE:
+                    {
+                        mp_raise_ValueError(MP_ERROR_TEXT("QUIRC: Unknown data type"));
+                        break;
+                    }
+                    case QUIRC_ERROR_DATA_OVERFLOW:
+                    {
+                        mp_raise_ValueError(MP_ERROR_TEXT("QUIRC: Data overflow"));
+                        break;
+                    }
+                    case QUIRC_ERROR_DATA_UNDERFLOW:
+                    {
+                        mp_raise_ValueError(MP_ERROR_TEXT("QUIRC: Data underflow"));
+                        break;
+                    }
+                    default:
+                    {
+                        result = &data;
+                        i = num_codes;
+                        break;
+                    }
+                    }
+                }
+            }
+        }
+    }
+
+    quirc_destroy(qr);
+
+    return result;
+}
+
+STATIC mp_obj_t qrdecoder_decode(void)
+{
+    mp_obj_t result = mp_const_none;
+
+    struct quirc_data *decode_data = qrdecoder_quirc_decoder(img_qr_sidorenko_2_map, pow(300, 2));
+
+    if (decode_data != NULL)
+    {
+        result = mp_obj_new_bytearray(sizeof(uint8_t) * decode_data->payload_len, decode_data->payload);
+    }
+
+    return result;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(qrdecoder_decode_obj, qrdecoder_decode);
+
+/****************************** MODULE ******************************/
+
+STATIC const mp_rom_map_elem_t qrdecoder_module_globals_table[] = {
+    {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_qrdecoder)},
+    {MP_ROM_QSTR(MP_QSTR_decode), MP_ROM_PTR(&qrdecoder_decode_obj)},
+};
+STATIC MP_DEFINE_CONST_DICT(qrdecoder_module_globals, qrdecoder_module_globals_table);
+
+// Define module object.
+const mp_obj_module_t qrdecoder_user_cmodule = {
+    .base = {&mp_type_module},
+    .globals = (mp_obj_dict_t *)&qrdecoder_module_globals,
+};
+
+// Register the module to make it available in Python
+MP_REGISTER_MODULE(MP_QSTR_qrdecoder, qrdecoder_user_cmodule, MODULE_QRDECODER_ENABLED);
