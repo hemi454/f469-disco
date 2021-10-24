@@ -57,7 +57,7 @@
 /// CCID maximum data message length
 #define CCID_MAX_DATA_LENGTH      (261U)
 /// CCID maximum data length
-#define CCID_MAX_RESP_LENGTH      (254U)
+#define CCID_MAX_RESP_LENGTH      (255U)
 /// Connection state
 typedef enum state_ {
   state_closed       = MP_QSTR_closed,       ///< Connection is closed

@@ -314,6 +314,7 @@ static void set_usb_features_t1(proto_handle_t handle, uint32_t dwFeatures, uint
     ok = ok && set_t1_config(handle, t1_cfg_ifsd, maxIFSD);
     ok = ok && set_t1_config(handle, t1_cfg_is_usb_reader, 1);
     ok = ok && set_t1_config(handle, t1_cfg_pps_size, 4);
+    ok = ok && set_t1_config(handle, t1_cfg_tm_interbyte, 400);
     if(!ok) {
       emit_error(handle, "error configuring USB card reader features");
     }

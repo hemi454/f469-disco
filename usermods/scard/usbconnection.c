@@ -78,6 +78,8 @@ STATIC mp_obj_t connection_make_new(const mp_obj_type_t* type, size_t n_args,
   self->processTimer = 150;
   self->dwFeatures = 0;
   self->TA_1 = 0x11;
+  hUsbHostFS.iccSlotStatus = ICC_INIT;
+  hUsbHostFS.procStatus = PROC_INACT;
 
   usb_timer_init(self);
   printf("\r\nNew USB smart card connection\n");
@@ -284,13 +286,16 @@ static void timer_task(usb_connection_obj_t* self) {
   self->prev_ticks_ms = ticks_ms;
   if (connection_timer_elapsed(&self->processTimer, elapsed)) {
     USBH_Process(&hUsbHostFS);
-    if (hUsbHostFS.gState == HOST_CLASS) {
-      self->process_state = process_state_ready;
+    if (hUsbHostFS.gState == HOST_CLASS && hUsbHostFS.procStatus == PROC_ACT) {
+      // Check smart card slot status
+      if(hUsbHostFS.iccSlotStatus == ICC_INSERTED || hUsbHostFS.iccSlotStatus == ICC_REMOVED){
+        self->process_state = process_state_ready;
+      }
     } else {
       self->process_state = process_state_init;
     }
     card_detection_task(self, &hUsbHostFS);
-    self->processTimer = 150;
+    self->processTimer = 100;
   }
   // Run protocol timer task only when we are connecting or connected
   if (state_connecting == self->state || state_connected == self->state) {
@@ -699,11 +704,8 @@ static bool card_present(usb_connection_obj_t* self,
                          USBH_HandleTypeDef* phost) {
   // Read pin with blocking debounce algorithm if no timer is created or
   // non-blocking debounce algorithm has not come to a stable state yet.
-  if (MP_OBJ_NULL == self->timer ||
-      self->presence_cycles < CARD_PRESENCE_CYCLES) {
     handle_card_presence_change(
         self, (phost->iccSlotStatus == ICC_INSERTED) ? true : false);
-  }
   return self->presence_state;
 }
 
@@ -1071,13 +1073,18 @@ STATIC mp_obj_t connection_connect(size_t n_args, const mp_obj_t* pos_args,
   self->CCID_Handle = hUsbHostFS.pActiveClass->pData;
   // Set IFSD=0x32 because we can receive more than 64 bytes per attempt
   self->protocol->set_usb_features(self->proto_handle,
-                                   self->chipCardDesc.dwFeatures, 0x32);
+                                   self->chipCardDesc.dwFeatures, 0x20);
   if (self->process_state != process_state_ready) {
     raise_SmartcardException("smart card reader is not connected");
   }
   // Apply power and reset the card
   if (!card_present(self, &hUsbHostFS)) {
-    raise_NoCardException("no card inserted");
+      raise_NoCardException("no card inserted");
+  }
+  if ((self->dwFeatures & CCID_CLASS_SHORT_APDU) ||
+      (self->dwFeatures & CCID_CLASS_EXTENDED_APDU))
+  {
+    raise_CardConnectionException("Smartcard reader is not supported");
   }
   hUsbHostFS.apduLen = CCID_ICC_HEADER_LENGTH;
   self->IccCmd[0] = 0x62;

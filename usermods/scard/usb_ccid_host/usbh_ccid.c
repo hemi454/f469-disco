@@ -261,11 +261,11 @@ static USBH_StatusTypeDef USBH_CCID_Process (USBH_HandleTypeDef *phost)
   USBH_StatusTypeDef req_status = USBH_OK;
   CCID_HandleTypeDef *CCID_Handle =  phost->pActiveClass->pData;
   USBH_ChipCardDescTypeDef chipCardDesc = phost->device.CfgDesc.Itf_Desc[0].CCD_Desc;
-  phost->iccSlotStatus = ICC_REMOVED;
   switch(CCID_Handle->state)
   {
     case CCID_IDLE_STATE:
       status = USBH_OK;
+      phost->procStatus = PROC_ACT;
       USBH_InterruptReceiveData(phost, phost->RDR_to_PC_NotifySlotChange,
                               sizeof(phost->RDR_to_PC_NotifySlotChange), CCID_Handle->CommItf.NotifPipe);
       if(phost->RDR_to_PC_NotifySlotChange[0] == 0x50 && phost->RDR_to_PC_NotifySlotChange[1] == 0x02)
@@ -396,7 +396,7 @@ USBH_StatusTypeDef  USBH_CCID_Receive(USBH_HandleTypeDef *phost, uint8_t *pbuff,
 */
 USBH_StatusTypeDef CCID_ProcessTransmission(USBH_HandleTypeDef *phost)
 {
-  CCID_HandleTypeDef *CCID_Handle =  phost->pActiveClass->pData;
+  CCID_Handle =  phost->pActiveClass->pData;
   USBH_URBStateTypeDef URB_Status = USBH_URB_IDLE;
   USBH_StatusTypeDef res;
   switch(CCID_Handle->data_tx_state)
@@ -419,9 +419,7 @@ USBH_StatusTypeDef CCID_ProcessTransmission(USBH_HandleTypeDef *phost)
                          CCID_Handle->DataItf.OutPipe,
                          1);
     }
-    
-    CCID_Handle->data_tx_state = CCID_SEND_DATA_WAIT;
-    
+    CCID_Handle->data_tx_state = CCID_IDLE; 
     break;
     
   case CCID_SEND_DATA_WAIT:
@@ -470,7 +468,7 @@ USBH_StatusTypeDef CCID_ProcessTransmission(USBH_HandleTypeDef *phost)
     else if( URB_Status == USBH_URB_NOTREADY )
     {
       CCID_Handle->data_tx_state = CCID_SEND_DATA; 
-    }
+    } 
     break;
   default:
     break;
@@ -513,12 +511,8 @@ void CCID_ProcessReception(USBH_HandleTypeDef *phost)
                       CCID_Handle->DataItf.InEpSize, 
                       CCID_Handle->DataItf.InPipe); 
       }
-      else
-      {
-        CCID_Handle->data_rx_state = CCID_IDLE;
-        USBH_CCID_ReceiveCallback(phost);
-      }
     }
+    CCID_Handle->data_rx_state = CCID_IDLE;
     break;
     
   default:
