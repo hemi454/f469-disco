@@ -429,11 +429,17 @@ typedef enum
   GET_SLOT_STATUS,
 } USBH_CmdTransferStatusTypeDef;
 
-typedef enum 
-{
-  ICC_INSERTED = 1,
-  ICC_REMOVED,
+typedef enum usb_scard_slot_status_ {
+  ICC_REMOVED = 0,
+  ICC_INSERTED,
+  ICC_INIT,
 } USBH_SlotStatusTypeDef;
+
+typedef enum usb_scard_process_status_ {
+  PROC_INACT = 0,
+  PROC_ACT,
+} USBH_ProcStatusTypeDef;
+
 /* Control request structure */
 typedef struct 
 {
@@ -499,6 +505,7 @@ typedef struct _USBH_HandleTypeDef
   void                 (* pUser )(struct _USBH_HandleTypeDef *pHandle, uint8_t id);
 #ifdef USB_CCID_HOST_MODE
   USBH_SlotStatusTypeDef iccSlotStatus;
+  USBH_ProcStatusTypeDef procStatus;
   uint8_t* apdu;
   size_t apduLen;
   uint8_t rawRxData[0xFF];

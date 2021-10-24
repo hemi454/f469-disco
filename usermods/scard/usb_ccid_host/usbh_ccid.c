@@ -261,7 +261,7 @@ static USBH_StatusTypeDef USBH_CCID_Process (USBH_HandleTypeDef *phost)
   USBH_StatusTypeDef req_status = USBH_OK;
   CCID_HandleTypeDef *CCID_Handle =  phost->pActiveClass->pData;
   USBH_ChipCardDescTypeDef chipCardDesc = phost->device.CfgDesc.Itf_Desc[0].CCD_Desc;
-  phost->iccSlotStatus = ICC_REMOVED;
+  phost->procStatus = PROC_ACT;
   switch(CCID_Handle->state)
   {
     case CCID_IDLE_STATE:
