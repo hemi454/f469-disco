@@ -7,7 +7,7 @@ ifeq ($(UNAME_S),)
 CFLAGS_USERMOD += -DT1_TX_FIFO_SIZE=600
 
 # Only STM32 series is currently supported
-ifeq ($(MCU_SERIES),$(filter $(MCU_SERIES),f0 f4 f7 l0 l4 wb))
+ifeq ($(MCU_SERIES),$(filter $(MCU_SERIES),f0 f4 f7 l0 l4 wb h7))
 
 # Reproduce environment variables from main makefile (not defined at the moment)
 SCARD_MPY_DIR = $(USERMOD_DIR)/../../micropython
