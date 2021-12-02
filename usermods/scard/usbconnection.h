@@ -54,10 +54,15 @@
 #define CCID_CLASS_EXCHANGE_MASK     0x00070000
 /// Length of ICC header
 #define CCID_ICC_HEADER_LENGTH    (10U)
+/// Communication buffer size (max=adpu+Lc+data+Le)
+/// we use a 64kB for extended APDU on APDU mode readers
+#define CMD_BUF_SIZE              (4 +3 +64*1024 +3)
 /// CCID maximum data message length
 #define CCID_MAX_DATA_LENGTH      (261U)
 /// CCID maximum data length
 #define CCID_MAX_RESP_LENGTH      (255U)
+/// CCID minimum endpoint size
+#define CCID_MIN_END_POINT_SIZE    (16U)
 /// Connection state
 typedef enum state_ {
   state_closed       = MP_QSTR_closed,       ///< Connection is closed
@@ -155,6 +160,7 @@ typedef struct usb_connection_obj_ {
   mp_obj_base_t base;               ///< Pointer to type of base class
   mp_obj_t reader;                  ///< Reader to which connection is bound
   state_t state;                    ///< Connection state
+  state_t state_ext_apdu;           ///< Connection state for extended apdu
   process_state_t process_state;    ///<  USB host process state
   mp_obj_t timer;                   ///< Timer object
   mp_obj_t atr;                     ///< ATR as bytes object

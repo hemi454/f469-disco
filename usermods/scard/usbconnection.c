@@ -6,6 +6,33 @@
  */
 
 #include "usbconnection.h"
+#define USB_DEBUG
+
+/// Minimal number of bytes for a valid ATR
+#define ATR_MIN_BYTES                   2
+/// TS0 byte: direct convention
+#define TS_CONVENTION_DIRECT            0x3B
+/// TS0 byte: inverse convention
+#define TS_CONVENTION_INVERSE           0x3F
+/// Bit within T0 or TD bytes indicating that TA is present
+#define TA_BIT                          (1)
+/// Bit within T0 or TD bytes indicating that TB is present
+#define TB_BIT                          (1 << 1)
+/// Bit within T0 or TD bytes indicating that TC is present
+#define TC_BIT                          (1 << 2)
+/// Bit within T0 or TD bytes indicating that TD is present
+#define TD_BIT                          (1 << 3)
+/// LRC size in bytes
+#define LRC_SIZE                        1
+/// CRC size in bytes
+#define CRC_SIZE                        2
+
+/// Transmission protocol or qualification of interface bytes
+typedef enum {
+  atr_prot_t0 = 0,  ///< T=0 protocol
+  atr_prot_t1 = 1,  ///< T=1 protocol
+  atr_globals = 15, ///< Global interface bytes
+} protocol_id_t;
 
 static void card_detection_task(usb_connection_obj_t* self,
                                 USBH_HandleTypeDef* phost);
@@ -57,6 +84,7 @@ STATIC mp_obj_t connection_make_new(const mp_obj_type_t* type, size_t n_args,
   self->base.type = &scard_UsbCardConnection_type;
   self->reader = args[ARG_reader].u_obj;
   self->state = state_closed;
+  self->state_ext_apdu = state_closed;
   self->CCID_Handle = NULL;
   self->timer = MP_OBJ_NULL;
   self->pbSeq = 0;
@@ -77,7 +105,7 @@ STATIC mp_obj_t connection_make_new(const mp_obj_type_t* type, size_t n_args,
   self->process_state = process_state_closed;
   self->processTimer = 150;
   self->dwFeatures = 0;
-  self->TA_1 = 0x11;
+  self->TA_1 = 0x95;
   hUsbHostFS.iccSlotStatus = ICC_INIT;
   hUsbHostFS.procStatus = PROC_INACT;
 
@@ -513,6 +541,40 @@ STATIC void connection_ccid_transmit_raw(usb_connection_obj_t* self,
   CCID_ProcessTransmission(phost);
 }
 
+static bool isBufNonEmpty(uint8_t* buf)
+{
+  unsigned int sum = 0;
+  for(int i = 0; i < sizeof(buf); i++)
+  {
+    sum = sum + buf[i];
+  }
+  if(sum > 0)
+    return true;
+  return false;
+}
+
+STATIC void connection_ccid_receive_extended_apdu(usb_connection_obj_t* self)
+{
+  uint32_t responseTimeout = 2000;
+  while(1)
+  {
+    mp_uint_t ticks_ms = mp_hal_ticks_ms();
+    mp_uint_t elapsed = scard_ticks_diff(ticks_ms, self->prev_ticks_ms);
+    self->prev_ticks_ms = ticks_ms;
+    connection_ccid_receive(&hUsbHostFS, hUsbHostFS.rawRxData,
+                          sizeof(hUsbHostFS.rawRxData));
+    if (connection_timer_elapsed(&responseTimeout, elapsed)){
+      raise_SmartcardException("response timeout is elapsed");
+    }
+    else if (hUsbHostFS.rawRxData[0] == RDR_to_PC_DataBlock){
+      break;
+    } else {
+      if (isBufNonEmpty(hUsbHostFS.rawRxData)){
+        break;
+       }
+    }
+  }
+}
 /**
  * Receive packet from the USB port
  *
@@ -532,6 +594,7 @@ STATIC void connection_ccid_receive(USBH_HandleTypeDef* phost, uint8_t* pbuff,
  *
  * @param self  instance of CardConnection class
  */
+/*
 static inline void wait_connect_blocking(usb_connection_obj_t* self) {
   uint8_t rx_buf[254] = {0};
   while (self->state == state_connecting) {
@@ -539,8 +602,7 @@ static inline void wait_connect_blocking(usb_connection_obj_t* self) {
     connection_ccid_receive(&hUsbHostFS, hUsbHostFS.rawRxData,
                             sizeof(hUsbHostFS.rawRxData));
     mp_hal_delay_ms(150);
-    uint16_t length =
-        USBH_LL_GetLastXferSize(&hUsbHostFS, self->CCID_Handle->DataItf.InPipe);
+    uint16_t length = USBH_LL_GetLastXferSize(&hUsbHostFS, self->CCID_Handle->DataItf.InPipe);
     if (length != 0) {
       memset(rx_buf, 0, sizeof(rx_buf));
       memcpy(rx_buf, hUsbHostFS.rawRxData + CCID_ICC_HEADER_LENGTH,
@@ -549,6 +611,198 @@ static inline void wait_connect_blocking(usb_connection_obj_t* self) {
                                 length - CCID_ICC_HEADER_LENGTH);
       timer_task(self);
       MICROPY_EVENT_POLL_HOOK
+    }
+  }
+}
+*/
+
+static inline void wait_connect_blocking(usb_connection_obj_t* self) {
+  while (self->state == state_connecting) {
+    connection_ccid_receive(&hUsbHostFS, hUsbHostFS.rawRxData,
+                            sizeof(hUsbHostFS.rawRxData));
+    if (hUsbHostFS.rawRxData[0] == RDR_to_PC_DataBlock) {
+      uint16_t dwLength = hUsbHostFS.rawRxData[1];
+      if (dwLength != 0) {
+        uint8_t rx_buf[CCID_MAX_RESP_LENGTH];
+        memcpy(rx_buf, hUsbHostFS.rawRxData + CCID_ICC_HEADER_LENGTH, dwLength);
+        self->protocol->serial_in(self->proto_handle, rx_buf, dwLength);
+        memset(hUsbHostFS.rawRxData, 0, sizeof(hUsbHostFS.rawRxData));
+      } else {
+        raise_SmartcardException("lenght of bulk-in message is incorrect");
+      }
+    }
+    timer_task(self);
+    MICROPY_EVENT_POLL_HOOK
+  }
+}
+
+/**
+ * Initializes ATR structure with default values
+ * @param p_atr    pointer to ATR structure to initialize
+ * @param atr_buf  buffer containing ATR
+ * @param atr_len  length of ATR in bytes
+ */
+static inline void atr_decoded_init(t1_atr_decoded_t* p_atr,
+                                    const uint8_t* atr_buf, size_t atr_len) {
+  p_atr->atr = atr_buf;
+  p_atr->atr_len = atr_len;
+  p_atr->convention = t1_cnv_direct;
+  p_atr->t0_supported = false;
+  p_atr->t1_supported = false;
+  p_atr->hist_bytes = NULL;
+  p_atr->hist_nbytes = 0;
+  for(int i = 0; i < t1_atr_intf_bytes; i++) {
+    p_atr->global_bytes[i] = -1;
+    p_atr->t1_bytes[i] = -1;
+  }
+}
+
+/**
+ * Returns number of interface bytes from given indicator Y
+ * @param y  indicator, "Y"
+ * @return   number of interface bytes
+ */
+static inline size_t atr_ibyte_num(uint8_t y) {
+  return ((y >> 3) & 1) + ((y >> 2) & 1) + ((y >> 1) & 1) + (y & 1);
+}
+
+/**
+ * Parses ATR message
+ *
+ * Limitations: only direct convention is supported, TS byte is ignored
+ * @param buf    buffer containing ATR
+ * @param len    length of ATR in bytes
+ * @param p_atr  pointer to ATR structure filled by this function
+ * @return       true if successful
+ */
+static bool connection_parse_atr_extended_apdu(const uint8_t *buf, size_t len, t1_atr_decoded_t* p_atr) {
+  // Size of one interface record, set of TAi, TBi and TCi bytes
+  const size_t intf_size = t1_atr_ta2 - t1_atr_ta1;
+  // Dummy buffer to receive unneeded interface bytes, safer than NULL
+  int16_t intf_null[intf_size];
+  // Pointer to buffer receiving interface bytes
+  int16_t* p_intf = intf_null;
+  // Index of current interface block, named as "i" in standard
+  size_t intf_idx = 1;
+  // Index within t1_ev_prm_atr_t::global_bytes[] array
+  size_t global_idx = 0;
+  // Index within t1_ev_prm_atr_t::t1_bytes[] array
+  size_t t1_idx = 0;
+  // Expected length in bytes
+  size_t exp_len = ATR_MIN_BYTES;
+  // Indicator of presence of TAi...TDi bytes, named as "Y" in standard
+  uint8_t indicator = 0;
+  // XOR checksum
+  uint8_t checksum = 0;
+  // Flag indicating presence of TCK byte
+  bool tck_present = false;
+  // Pointer to current byte
+  const uint8_t *p_byte = buf;
+
+  // Fill "atr" and "atr_len", set other fields to defaults
+  atr_decoded_init(p_atr, buf, len);
+
+  // Parse all expected bytes of ATR but not more than contained in buffer
+  for(size_t n = 0; n < len && exp_len <= len && n < exp_len; n++, p_byte++) {
+    if(n == 0) { // TS, initial character
+      if(*p_byte == TS_CONVENTION_INVERSE) {
+        p_atr->convention = t1_cnv_inverse;
+      } else if(*p_byte != TS_CONVENTION_DIRECT) {
+        return false;
+      }
+    } else if(n == 1) { // T0, format byte
+      exp_len += p_atr->hist_nbytes = *p_byte & 0x0F;
+      indicator = *p_byte >> 4;
+      if(indicator) {
+          p_intf = &p_atr->global_bytes[global_idx];
+          global_idx += intf_size;
+          exp_len += atr_ibyte_num(indicator);
+      }
+      if(!(indicator & TD_BIT)) { // TD1 is absent, only T=0 is supported
+        p_atr->t0_supported = true;
+      }
+    } else {
+      if(indicator & TA_BIT) { // TA byte
+        p_intf[t1_atr_ta1] = *p_byte;
+        indicator ^= TA_BIT;
+      } else if(indicator & TB_BIT) { // TB byte
+        p_intf[t1_atr_tb1] = *p_byte;
+        indicator ^= TB_BIT;
+      } else if(indicator & TC_BIT) { // TC byte
+        p_intf[t1_atr_tc1] = *p_byte;
+        indicator ^= TC_BIT;
+      } else if(indicator & TD_BIT) { // TD byte
+        p_intf = intf_null;
+        indicator = *p_byte >> 4;
+        if(indicator) {
+          protocol_id_t prot_id = (protocol_id_t)(*p_byte & 0x0F);
+          exp_len += atr_ibyte_num(indicator);
+          ++intf_idx;
+          if(prot_id == atr_prot_t0) {
+            p_atr->t0_supported = true;
+          } else if(prot_id == atr_prot_t1) {
+            p_atr->t1_supported = true;
+          }
+          if(prot_id == atr_prot_t1 && intf_idx > 2) {
+            if(t1_idx + intf_size <= t1_atr_intf_bytes) {
+              p_intf = &p_atr->t1_bytes[t1_idx];
+              t1_idx += intf_size;
+            }
+          } else if(prot_id == atr_globals || intf_idx <= 2) {
+            if(global_idx + intf_size <= t1_atr_intf_bytes) {
+              p_intf = &p_atr->global_bytes[global_idx];
+              global_idx += intf_size;
+            }
+          }
+          if(prot_id != atr_prot_t0 && !tck_present) { // Is TCK present?
+            tck_present = true;
+            ++exp_len;
+          }
+        }
+      } else if(p_atr->hist_bytes == NULL) { // Historical bytes
+        p_atr->hist_bytes = p_byte;
+      }
+    }
+
+    if(n > 0) { // Calculate checksum
+      checksum ^= *p_byte;
+    }
+  }
+
+  // Ensure that ATR is not truncated and TCK is correct (if exists)
+  if(exp_len <= len && (!tck_present || checksum == 0) ) {
+    return true;
+  }
+  return false;
+}
+
+static inline void wait_connect_blocking_extended_apdu(usb_connection_obj_t* self) {
+  uint8_t rx_buf[512] = {0};
+  uint16_t rcvBytes = 0;
+  uint16_t needToRcv = 0;
+  unsigned int dwLength = 0; 
+  while (self->state_ext_apdu == state_connecting) {
+    connection_ccid_receive(&hUsbHostFS, hUsbHostFS.rawRxData,
+                        sizeof(hUsbHostFS.rawRxData));
+    if (hUsbHostFS.rawRxData[0] == RDR_to_PC_DataBlock) {
+      /// Copy all available data into buffer
+      memcpy(rx_buf, hUsbHostFS.rawRxData + CCID_ICC_HEADER_LENGTH, self->CCID_Handle->DataItf.InEpSize);
+      /// Calculate if we recieved all data
+      rcvBytes = USBH_LL_GetLastXferPktSize(&hUsbHostFS, self->CCID_Handle->DataItf.InPipe) - CCID_ICC_HEADER_LENGTH;
+      dwLength = dw2i(hUsbHostFS.rawRxData, 1);
+      needToRcv = dwLength - rcvBytes;
+      memset(hUsbHostFS.rawRxData, 0, sizeof(hUsbHostFS.rawRxData));
+    } 
+    if(needToRcv > 0 && hUsbHostFS.rawRxData[0] != 0)
+    {
+      uint16_t lastTransferlength = USBH_LL_GetLastXferPktSize(&hUsbHostFS, self->CCID_Handle->DataItf.InPipe); 
+      memcpy(rx_buf + rcvBytes, hUsbHostFS.rawRxData, needToRcv); 
+      t1_atr_decoded_t atr_decoded;
+      if(connection_parse_atr_extended_apdu(rx_buf, dwLength, &atr_decoded)){
+        self->atr = mp_obj_new_bytes(atr_decoded.atr, atr_decoded.atr_len);
+        self->TA_1 = atr_decoded.atr[2];
+        self->state_ext_apdu = state_connected;
+      } 
     }
   }
 }
@@ -768,6 +1022,41 @@ static inline void wait_response_blocking(usb_connection_obj_t* self) {
 }
 
 /**
+ * Waits for smart card response from reader which supports extended apdu exchange 
+ *
+ * @param self  instance of CardConnection class
+ */
+static inline void wait_response_blocking_extended_apdu(usb_connection_obj_t* self) {
+    uint8_t rx_buf[512] = {0};
+    unsigned int bytesOffset = 0;
+    memset(hUsbHostFS.rawRxData, 0, sizeof(hUsbHostFS.rawRxData));
+    connection_ccid_receive_extended_apdu(self);
+    unsigned int dwLength = dw2i(hUsbHostFS.rawRxData, 1);
+    if(dwLength < self->CCID_Handle->DataItf.InEpSize){
+      memcpy(rx_buf, hUsbHostFS.rawRxData, dwLength);
+    }
+    else {
+      memcpy(rx_buf, hUsbHostFS.rawRxData, self->CCID_Handle->DataItf.InEpSize);
+    }
+    if(hUsbHostFS.rawRxData[0] == RDR_to_PC_DataBlock){
+      unsigned int pktCount = dwLength/self->CCID_Handle->DataItf.InEpSize;
+      for(int i = 0; i < pktCount; i++)
+      {
+        memset(hUsbHostFS.rawRxData, 0, sizeof(hUsbHostFS.rawRxData));
+        connection_ccid_receive_extended_apdu(self);
+        uint16_t length = USBH_LL_GetLastXferPktSize(&hUsbHostFS, self->CCID_Handle->DataItf.InPipe);   
+        bytesOffset = bytesOffset + self->CCID_Handle->DataItf.InEpSize;
+        memcpy(rx_buf + bytesOffset, hUsbHostFS.rawRxData, length);
+      }
+      for(int i = 0; i < 256; i++)
+      {
+        printf("0x%X ", rx_buf[i]);
+      }
+      printf("\n");
+    }
+}
+
+/**
  * Callback function that outputs bytes to serial port
  *
  * @param self_in  instance of user class
@@ -936,6 +1225,13 @@ STATIC mp_obj_t connection_poweron(size_t n_args, const mp_obj_t* pos_args,
   new_protocol = (protocol_na == new_protocol) ? protocol_any : new_protocol;
   change_protocol(self, new_protocol, true, true);
 
+  self->chipCardDesc = hUsbHostFS.device.CfgDesc.Itf_Desc[0].CCD_Desc;
+  self->dwFeatures = self->chipCardDesc.dwFeatures;
+  self->CCID_Handle = hUsbHostFS.pActiveClass->pData;
+  // Set IFSD=0x32 because we can receive more than 64 bytes per attempt
+  self->protocol->set_usb_features(self->proto_handle,
+                                   self->chipCardDesc.dwFeatures, 0x08);
+
   self->CCID_Handle = hUsbHostFS.pActiveClass->pData;
   if (self->process_state == process_state_ready) {
     notify_observers(self, event_insertion);
@@ -949,87 +1245,34 @@ STATIC mp_obj_t connection_poweron(size_t n_args, const mp_obj_t* pos_args,
     self->IccCmd[4] = 0x00;
     self->IccCmd[5] = chipCardDesc.bCurrentSlotIndex;
     self->IccCmd[6] = self->pbSeq++;
-    self->IccCmd[7] = getVoltageSupport(&chipCardDesc);
+    self->IccCmd[7] = 0x01;
     self->IccCmd[8] = 0x00;
     self->IccCmd[9] = 0x00;
     hUsbHostFS.apdu = self->IccCmd;
-    notify_observers_command(self, self->IccCmd);
-    // Send PowerOn
     connection_ccid_transmit_raw(self, &hUsbHostFS, hUsbHostFS.apdu,
-                                 hUsbHostFS.apduLen);
+                              hUsbHostFS.apduLen);
+    self->state_ext_apdu = state_connecting;
+    wait_connect_blocking_extended_apdu(self);
     memset(hUsbHostFS.rawRxData, 0, sizeof(hUsbHostFS.rawRxData));
-    connection_ccid_receive(&hUsbHostFS, hUsbHostFS.rawRxData,
-                            sizeof(hUsbHostFS.rawRxData));
-    mp_hal_delay_ms(150);
-    printf("ATR\n");
-    for (int i = 0; i < sizeof(hUsbHostFS.rawRxData); i++) {
-      printf("0x%X ", hUsbHostFS.rawRxData[i]);
-    }
-    printf("\n");
-    // Send PPS
-    // uint8_t pps[] = {0xFF, 0x01, 0xFE};
-    uint8_t pps[] = {0xff, 0x11, 0x95, 0x7b};
-    /*
-    memset(hUsbHostFS.rawRxData, 0, sizeof(hUsbHostFS.rawRxData));
-    connection_ccid_transmit_xfr_block(self, &hUsbHostFS, (uint8_t*)pps,
-    sizeof(pps)); connection_ccid_receive(&hUsbHostFS, hUsbHostFS.rawRxData,
-    sizeof(hUsbHostFS.rawRxData)); mp_hal_delay_ms(150); printf("PPS\n");
-    for(int i = 0; i < sizeof(hUsbHostFS.rawRxData); i++)
-    {
-      printf("0x%X ", hUsbHostFS.rawRxData[i]);
-    }
-    printf("\n");
-    */
-    // Get param
-    connection_ccid_transmit_get_parameters(self, &hUsbHostFS);
-    memset(hUsbHostFS.rawRxData, 0, sizeof(hUsbHostFS.rawRxData));
-    printf("GET PARAM\n");
-    connection_ccid_receive(&hUsbHostFS, hUsbHostFS.rawRxData, 64);
-    for (int i = 0; i < 64; i++) {
-      printf(" 0x%x", hUsbHostFS.rawRxData[i]);
-    }
-    printf("\n");
-    mp_hal_delay_ms(150);
-    // Set param
-    connection_ccid_transmit_set_parameters(self, &hUsbHostFS);
-    memset(hUsbHostFS.rawRxData, 0, sizeof(hUsbHostFS.rawRxData));
-    printf("SET PARAM\n");
-    connection_ccid_receive(&hUsbHostFS, hUsbHostFS.rawRxData, 64);
-    for (int i = 0; i < 64; i++) {
-      printf(" 0x%x", hUsbHostFS.rawRxData[i]);
-    }
-    printf("\n");
-    mp_hal_delay_ms(150);
-    // Send IFSD 00 C1 01 FE 3E ( 00 C1 01 F7 37 )
-    uint8_t ifsd[] = {0x00, 0xC1, 0x01, 0xF7, 0x37};
-    memset(hUsbHostFS.rawRxData, 0, sizeof(hUsbHostFS.rawRxData));
-    connection_ccid_transmit_xfr_block(self, &hUsbHostFS, (uint8_t*)ifsd,
-                                       sizeof(ifsd));
-    connection_ccid_receive(&hUsbHostFS, hUsbHostFS.rawRxData,
-                            sizeof(hUsbHostFS.rawRxData));
-    mp_hal_delay_ms(150);
-    printf("IFSD\n");
-    for (int i = 0; i < sizeof(hUsbHostFS.rawRxData); i++) {
-      printf("0x%X ", hUsbHostFS.rawRxData[i]);
-    }
-    printf("\n");
-    memset(hUsbHostFS.rawRxData, 0, sizeof(hUsbHostFS.rawRxData));
-    // Send APDU Select  00 00 0B 00 A4 04 00 06 B0 0B 51 11 CA 01 9D
-    uint8_t apdu_select[] = {0x00, 0x00, 0x0B, 0x00, 0xA4, 0x04, 0x00, 0x06,
-                             0xB0, 0x0B, 0x51, 0x11, 0xCA, 0x01, 0x9D};
+    /// Select
+    uint8_t apdu_select[] = {0x00, 0xA4, 0x04, 0x00, 0x06, 0xB0, 0x0B, 0x51, 0x11, 0xCA, 0x01};
     connection_ccid_transmit_xfr_block(self, &hUsbHostFS, (uint8_t*)apdu_select,
                                        sizeof(apdu_select));
     connection_ccid_receive(&hUsbHostFS, hUsbHostFS.rawRxData,
                             sizeof(hUsbHostFS.rawRxData));
     mp_hal_delay_ms(150);
-    printf("SELECT\n");
-    for (int i = 0; i < sizeof(hUsbHostFS.rawRxData); i++) {
+    for(int i = 0; i < 32; i++)
+    {
       printf("0x%X ", hUsbHostFS.rawRxData[i]);
     }
-    // Send APDU
-    // self->state = state_connected;
+    printf("\n");
+    /// Get data
+    uint8_t apdu_get[] = {0xB0, 0xA1, 0x00, 0x00, 0x00};
+    connection_ccid_transmit_xfr_block(self, &hUsbHostFS, (uint8_t*)apdu_get,
+                                       sizeof(apdu_get));
+    wait_response_blocking_extended_apdu(self);
   } else {
-    raise_SmartcardException("3smart card reader is not connected");
+    raise_SmartcardException("smart card reader is not connected");
   }
   return mp_const_none;
 }
@@ -1071,7 +1314,7 @@ STATIC mp_obj_t connection_connect(size_t n_args, const mp_obj_t* pos_args,
   self->chipCardDesc = hUsbHostFS.device.CfgDesc.Itf_Desc[0].CCD_Desc;
   self->dwFeatures = self->chipCardDesc.dwFeatures;
   self->CCID_Handle = hUsbHostFS.pActiveClass->pData;
-  // Set IFSD=0x32 because we can receive more than 64 bytes per attempt
+  // Set IFSD=0x20 because we can receive more than 64 bytes per attempt
   self->protocol->set_usb_features(self->proto_handle,
                                    self->chipCardDesc.dwFeatures, 0x20);
   if (self->process_state != process_state_ready) {
@@ -1084,7 +1327,7 @@ STATIC mp_obj_t connection_connect(size_t n_args, const mp_obj_t* pos_args,
   if ((self->dwFeatures & CCID_CLASS_SHORT_APDU) ||
       (self->dwFeatures & CCID_CLASS_EXTENDED_APDU))
   {
-    raise_CardConnectionException("Smartcard reader is not supported");
+    //raise_CardConnectionException("Smartcard reader is not supported");
   }
   hUsbHostFS.apduLen = CCID_ICC_HEADER_LENGTH;
   self->IccCmd[0] = 0x62;
@@ -1103,7 +1346,15 @@ STATIC mp_obj_t connection_connect(size_t n_args, const mp_obj_t* pos_args,
                                hUsbHostFS.apduLen);
   // Update state
   self->state = state_connecting;
-  wait_connect_blocking(self);
+  if ((self->dwFeatures & CCID_CLASS_SHORT_APDU) ||
+    (self->dwFeatures & CCID_CLASS_EXTENDED_APDU))
+  {
+    wait_connect_blocking_extended_apdu(self);
+  }
+  else
+  {
+    wait_connect_blocking(self);
+  }
   memset(hUsbHostFS.rawRxData, 0, sizeof(hUsbHostFS.rawRxData));
   return mp_const_none;
 }
@@ -1217,7 +1468,12 @@ STATIC mp_obj_t connection_getATR(mp_obj_t self_in) {
   if (state_closed != self->state && self->atr) {
     return self->atr;
   }
-  return mp_const_none;
+  else if (state_closed != self->state_ext_apdu && self->atr){
+    return self->atr;
+  }
+  else{
+    return mp_const_none;
+  }
 }
 /**
  * @brief Returns connection state
