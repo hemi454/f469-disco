@@ -781,9 +781,16 @@ static inline void wait_connect_blocking_extended_apdu(usb_connection_obj_t* sel
   uint16_t rcvBytes = 0;
   uint16_t needToRcv = 0;
   unsigned int dwLength = 0; 
+  self->atr_timeout_ms = 2000;
   while (self->state_ext_apdu == state_connecting) {
+    mp_uint_t ticks_ms = mp_hal_ticks_ms();
+    mp_uint_t elapsed = scard_ticks_diff(ticks_ms, self->prev_ticks_ms);
+    self->prev_ticks_ms = ticks_ms;
     connection_ccid_receive(&hUsbHostFS, hUsbHostFS.rawRxData,
                         sizeof(hUsbHostFS.rawRxData));
+    if (connection_timer_elapsed(&self->atr_timeout_ms, elapsed)){
+      raise_SmartcardException("atr timeout is elapsed");
+    }
     if (hUsbHostFS.rawRxData[0] == RDR_to_PC_DataBlock) {
       /// Copy all available data into buffer
       memcpy(rx_buf, hUsbHostFS.rawRxData + CCID_ICC_HEADER_LENGTH, self->CCID_Handle->DataItf.InEpSize);
@@ -1344,15 +1351,16 @@ STATIC mp_obj_t connection_connect(size_t n_args, const mp_obj_t* pos_args,
   notify_observers_command(self, self->IccCmd);
   connection_ccid_transmit_raw(self, &hUsbHostFS, hUsbHostFS.apdu,
                                hUsbHostFS.apduLen);
-  // Update state
-  self->state = state_connecting;
+  // Update state and wait for connection established
   if ((self->dwFeatures & CCID_CLASS_SHORT_APDU) ||
     (self->dwFeatures & CCID_CLASS_EXTENDED_APDU))
   {
+    self->state_ext_apdu = state_connecting;
     wait_connect_blocking_extended_apdu(self);
   }
   else
   {
+    self->state = state_connecting;
     wait_connect_blocking(self);
   }
   memset(hUsbHostFS.rawRxData, 0, sizeof(hUsbHostFS.rawRxData));
@@ -1408,14 +1416,28 @@ STATIC mp_obj_t connection_getReader(mp_obj_t self_in) {
  */
 STATIC mp_obj_t connection_isActive(mp_obj_t self_in) {
   usb_connection_obj_t* self = (usb_connection_obj_t*)self_in;
+  if ((self->dwFeatures & CCID_CLASS_SHORT_APDU) ||
+    (self->dwFeatures & CCID_CLASS_EXTENDED_APDU))
+  {
+    switch (self->state_ext_apdu) {
+      case state_connecting:
+      case state_connected:
+        return mp_const_true;
 
-  switch (self->state) {
-    case state_connecting:
-    case state_connected:
-      return mp_const_true;
+      default:
+        return mp_const_false;
+    }
+  }
+  else
+  {
+    switch (self->state) {
+      case state_connecting:
+      case state_connected:
+        return mp_const_true;
 
-    default:
-      return mp_const_false;
+      default:
+        return mp_const_false;
+    }
   }
 }
 
