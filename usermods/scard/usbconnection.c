@@ -105,7 +105,7 @@ STATIC mp_obj_t connection_make_new(const mp_obj_type_t* type, size_t n_args,
   self->process_state = process_state_closed;
   self->processTimer = 150;
   self->dwFeatures = 0;
-  self->TA_1 = 0x95;
+  self->TA_1 = 0x11;
   hUsbHostFS.iccSlotStatus = ICC_INIT;
   hUsbHostFS.procStatus = PROC_INACT;
 
@@ -1034,13 +1034,66 @@ static inline void wait_response_blocking(usb_connection_obj_t* self) {
  * @param self  instance of CardConnection class
  */
 static inline void wait_response_blocking_extended_apdu(usb_connection_obj_t* self) {
+  uint8_t rx_buf[512] = {0};
+  uint16_t rcvBytes = 0;
+  int needToRcv = -1;
+  unsigned int dwLength = 0;
+  unsigned int bytesOffset = 0; 
+  bool gotFirtsFrame = false;
+  t1_apdu_t apdu_received;
+  self->rsp_timeout_ms = 15000;
+  while (self->response == MP_OBJ_NULL) {
+    mp_uint_t ticks_ms = mp_hal_ticks_ms();
+    mp_uint_t elapsed = scard_ticks_diff(ticks_ms, self->prev_ticks_ms);
+    self->prev_ticks_ms = ticks_ms;
+    // memset(hUsbHostFS.rawRxData, 0, sizeof(hUsbHostFS.rawRxData));
+    connection_ccid_receive(&hUsbHostFS, hUsbHostFS.rawRxData,
+                        sizeof(hUsbHostFS.rawRxData));
+    if (hUsbHostFS.rawRxData[0] == RDR_to_PC_DataBlock) {
+      /// Copy all available data into buffer
+      memcpy(rx_buf, hUsbHostFS.rawRxData + CCID_ICC_HEADER_LENGTH, self->CCID_Handle->DataItf.InEpSize);
+      /// Calculate if we recieved all data
+      rcvBytes = USBH_LL_GetLastXferPktSize(&hUsbHostFS, self->CCID_Handle->DataItf.InPipe) - CCID_ICC_HEADER_LENGTH;
+      dwLength = dw2i(hUsbHostFS.rawRxData, 1);
+      needToRcv = dwLength - rcvBytes;
+      gotFirtsFrame = true;
+    }
+    /// If we have more data to receive save it to the buffer
+    if(hUsbHostFS.rawRxData[0] != 0 && needToRcv > 0 && gotFirtsFrame)
+    {
+      uint16_t length = USBH_LL_GetLastXferPktSize(&hUsbHostFS, self->CCID_Handle->DataItf.InPipe);   
+      memcpy(rx_buf + bytesOffset, hUsbHostFS.rawRxData, length);
+      needToRcv = needToRcv - length;
+      bytesOffset = bytesOffset + self->CCID_Handle->DataItf.InEpSize;
+    }
+    /// If we received all data save response and exit from while loop
+    if(needToRcv == 0)
+    {
+      mp_obj_t response = make_response_list(rx_buf, dwLength);
+      notify_observers_response(self, response);
+      if (self->blocking) {
+        self->response = response;
+      }
+    }
+    if (connection_timer_elapsed(&self->rsp_timeout_ms, elapsed)){
+      raise_SmartcardException("response timeout is elapsed");
+    }   
+  }
+}
+
+/**
+ * Waits for smart card response from reader which supports extended apdu exchange 
+ *
+ * @param self  instance of CardConnection class
+ */
+static inline void wait_response_blocking_extended_apdu_2(usb_connection_obj_t* self) {
     uint8_t rx_buf[512] = {0};
     unsigned int bytesOffset = 0;
     memset(hUsbHostFS.rawRxData, 0, sizeof(hUsbHostFS.rawRxData));
     connection_ccid_receive_extended_apdu(self);
     unsigned int dwLength = dw2i(hUsbHostFS.rawRxData, 1);
     if(dwLength < self->CCID_Handle->DataItf.InEpSize){
-      memcpy(rx_buf, hUsbHostFS.rawRxData, dwLength);
+      memcpy(rx_buf, hUsbHostFS.rawRxData + CCID_ICC_HEADER_LENGTH, dwLength);
     }
     else {
       memcpy(rx_buf, hUsbHostFS.rawRxData, self->CCID_Handle->DataItf.InEpSize);
@@ -1060,6 +1113,12 @@ static inline void wait_response_blocking_extended_apdu(usb_connection_obj_t* se
         printf("0x%X ", rx_buf[i]);
       }
       printf("\n");
+    }
+    t1_apdu_t apdu_received;
+    mp_obj_t response = make_response_list(rx_buf + CCID_ICC_HEADER_LENGTH, dwLength);
+    notify_observers_response(self, response);
+    if (self->blocking) {
+      self->response = response;
     }
 }
 
@@ -1141,9 +1200,21 @@ STATIC mp_obj_t connection_transmit(size_t n_args, const mp_obj_t* pos_args,
   mp_arg_parse_all(n_args - 1U, pos_args + 1U, kw_args,
                    MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
-  // Check connection state
-  if (state_connected != self->state) {
-    raise_SmartcardException("card not connected");
+  // Check connection state for card readers with 
+  // extended APDU Level of exchange
+  if ((self->dwFeatures & CCID_CLASS_SHORT_APDU) ||
+    (self->dwFeatures & CCID_CLASS_EXTENDED_APDU))
+  {
+    if (state_connected != self->state_ext_apdu) {
+      raise_SmartcardException("card not connected");
+    }
+  }
+  else
+  {
+    // Check connection state
+    if (state_connected != self->state) {
+      raise_SmartcardException("card not connected");
+    }
   }
 
   // Change smart card protocol if requested
@@ -1190,14 +1261,30 @@ STATIC mp_obj_t connection_transmit(size_t n_args, const mp_obj_t* pos_args,
   // Transmit APDU
   self->response = MP_OBJ_NULL;
   memset(hUsbHostFS.rawRxData, 0, sizeof(hUsbHostFS.rawRxData));
-  self->protocol->transmit_apdu(self->proto_handle, bufinfo.buf, bufinfo.len);
+  if ((self->dwFeatures & CCID_CLASS_SHORT_APDU) ||
+    (self->dwFeatures & CCID_CLASS_EXTENDED_APDU))
+  {
+    connection_ccid_transmit_xfr_block(self, &hUsbHostFS, (uint8_t*)bufinfo.buf,
+                                    bufinfo.len);
+  }
+  else
+  {
+    self->protocol->transmit_apdu(self->proto_handle, bufinfo.buf, bufinfo.len);
+  }
   // Let's free dynamic buffer manually to help the GC
   if (dynamic_buf) {
     m_del(uint8_t, dynamic_buf, bufinfo.len);
     dynamic_buf = NULL;
   }
   if (self->blocking) {
-    wait_response_blocking(self);
+    if ((self->dwFeatures & CCID_CLASS_SHORT_APDU) || (self->dwFeatures & CCID_CLASS_EXTENDED_APDU))
+    {
+      wait_response_blocking_extended_apdu(self);
+    }
+    else
+    {
+      wait_response_blocking(self);
+    }
     // Do not keep the reference to allow GC to remove response later
     mp_obj_t response = self->response;
     self->response = MP_OBJ_NULL;
@@ -1277,7 +1364,7 @@ STATIC mp_obj_t connection_poweron(size_t n_args, const mp_obj_t* pos_args,
     uint8_t apdu_get[] = {0xB0, 0xA1, 0x00, 0x00, 0x00};
     connection_ccid_transmit_xfr_block(self, &hUsbHostFS, (uint8_t*)apdu_get,
                                        sizeof(apdu_get));
-    wait_response_blocking_extended_apdu(self);
+    wait_response_blocking_extended_apdu_2(self);
   } else {
     raise_SmartcardException("smart card reader is not connected");
   }
@@ -1330,11 +1417,6 @@ STATIC mp_obj_t connection_connect(size_t n_args, const mp_obj_t* pos_args,
   // Apply power and reset the card
   if (!card_present(self, &hUsbHostFS)) {
       raise_NoCardException("no card inserted");
-  }
-  if ((self->dwFeatures & CCID_CLASS_SHORT_APDU) ||
-      (self->dwFeatures & CCID_CLASS_EXTENDED_APDU))
-  {
-    //raise_CardConnectionException("Smartcard reader is not supported");
   }
   hUsbHostFS.apduLen = CCID_ICC_HEADER_LENGTH;
   self->IccCmd[0] = 0x62;
