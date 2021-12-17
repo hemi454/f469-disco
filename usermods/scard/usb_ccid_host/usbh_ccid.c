@@ -357,7 +357,7 @@ USBH_StatusTypeDef  USBH_CCID_Transmit(USBH_HandleTypeDef *phost, uint8_t *pbuff
 {
   USBH_StatusTypeDef Status = USBH_BUSY;
   CCID_HandleTypeDef *CCID_Handle =  phost->pActiveClass->pData;
-  
+  // CCID_Handle =  phost->pActiveClass->pData;
   if((CCID_Handle->state == CCID_IDLE_STATE))
   {
     CCID_Handle->pTxData = pbuff;
@@ -396,85 +396,20 @@ USBH_StatusTypeDef  USBH_CCID_Receive(USBH_HandleTypeDef *phost, uint8_t *pbuff,
 */
 USBH_StatusTypeDef CCID_ProcessTransmission(USBH_HandleTypeDef *phost)
 {
-  CCID_Handle =  phost->pActiveClass->pData;
+  CCID_HandleTypeDef *CCID_Handle =  phost->pActiveClass->pData;
   USBH_URBStateTypeDef URB_Status = USBH_URB_IDLE;
   USBH_StatusTypeDef res;
   switch(CCID_Handle->data_tx_state)
   {
  
   case CCID_SEND_DATA:
-    if(CCID_Handle->TxDataLength > CCID_Handle->DataItf.OutEpSize)
-    {
-      res = USBH_BulkSendData (phost,
-                         CCID_Handle->pTxData, 
-                         CCID_Handle->DataItf.OutEpSize, 
-                         CCID_Handle->DataItf.OutPipe,
-                         1);
-    }
-    else
-    {
-      res = USBH_BulkSendData (phost,
-                         CCID_Handle->pTxData, 
-                         CCID_Handle->TxDataLength, 
-                         CCID_Handle->DataItf.OutPipe,
-                         1);
-    }
-    //CCID_Handle->data_tx_state = CCID_IDLE; 
-    //break;
-    
-  //case CCID_SEND_DATA_WAIT:
-    USBH_Delay(200);
-    URB_Status = USBH_LL_GetURBState(phost, CCID_Handle->DataItf.OutPipe); 
-    /*Check the status done for transmssion*/
-    if(URB_Status == USBH_URB_DONE )
-    { 
-      printf("USBH_URB_DONE\n");        
-      if(CCID_Handle->TxDataLength > CCID_Handle->DataItf.OutEpSize)
-      {
-        CCID_Handle->TxDataLength -= CCID_Handle->DataItf.OutEpSize ;
-        CCID_Handle->pTxData += CCID_Handle->DataItf.OutEpSize;
-      }
-      else
-      {
-        CCID_Handle->TxDataLength = 0;
-      }
-      
-      if( CCID_Handle->TxDataLength > 0)
-      {
-        if(CCID_Handle->TxDataLength > CCID_Handle->DataItf.OutEpSize)
-        {
-          res = USBH_BulkSendData (phost,
-                            CCID_Handle->pTxData, 
-                            CCID_Handle->DataItf.OutEpSize, 
-                            CCID_Handle->DataItf.OutPipe,
-                            1);
-        }
-        else
-        {
-          res = USBH_BulkSendData (phost,
-                            CCID_Handle->pTxData, 
-                            CCID_Handle->TxDataLength, 
-                            CCID_Handle->DataItf.OutPipe,
-                            1);
-        } 
-      }
-      else
-      {
-        CCID_Handle->data_tx_state = CCID_IDLE;    
-        USBH_CCID_TransmitCallback(phost);
-
-      }
-    }
-    else if( URB_Status == USBH_URB_NOTREADY )
-    {
-      CCID_Handle->data_tx_state = CCID_SEND_DATA; 
-    }
-    else
-    { 
-      printf("USBH_IDLE\n"); 
-      CCID_Handle->data_tx_state = CCID_IDLE; 
-    }
-    break;
+    res = USBH_BulkSendData (phost,
+                      CCID_Handle->pTxData, 
+                      CCID_Handle->TxDataLength, 
+                      CCID_Handle->DataItf.OutPipe,
+                      0);
+    CCID_Handle->data_tx_state = CCID_IDLE;
+    break; 
   default:
     break;
   }
@@ -488,6 +423,7 @@ USBH_StatusTypeDef CCID_ProcessTransmission(USBH_HandleTypeDef *phost)
 
 void CCID_ProcessReception(USBH_HandleTypeDef *phost)
 {
+  CCID_HandleTypeDef *CCID_Handle =  phost->pActiveClass->pData;
   USBH_URBStateTypeDef URB_Status = USBH_URB_IDLE;
   uint16_t length;
 
