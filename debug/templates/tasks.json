@@ -14,6 +14,42 @@
             ]
         },
         {
+            "label": "Debug build for device STM32H7A3xxQ",
+            "type": "shell",
+            "command": "make disco BOARD=STM32H7A3xxQ DEBUG=1",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Clean and Debug build for device STM32H7A3xxQ",
+            "type": "shell",
+            "command": "make clean disco BOARD=STM32H7A3xxQ DEBUG=1",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Clean and Debug build for device",
+            "type": "shell",
+            "command": "make clean disco DEBUG=1",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
             "label": "Debug build for device",
             "type": "shell",
             "command": "make disco DEBUG=1",
@@ -24,6 +60,39 @@
                 "kind": "build",
                 "isDefault": true
             }
+        },
+        {
+            "label": "Release build for device STM32H7A3xxQ",
+            "type": "shell",
+            "command": "make disco BOARD=STM32H7A3xxQ",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Clean and Release build for device STM32H7A3xxQ",
+            "type": "shell",
+            "command": "make clean disco BOARD=STM32H7A3xxQ",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Clean and Release build for device",
+            "type": "shell",
+            "command": "make clean disco",
+            "problemMatcher": [
+              "$gcc"
+            ],
+            "group": "build",
         },
         {
             "label": "Release build for device",
