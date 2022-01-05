@@ -26,7 +26,7 @@
             }
         },
         {
-            "label": "Clean and Debug build for device STM32H7A3xxQ",
+            "label": "Rebuild debug for device STM32H7A3xxQ",
             "type": "shell",
             "command": "make clean disco BOARD=STM32H7A3xxQ DEBUG=1",
             "problemMatcher": [
@@ -38,7 +38,7 @@
             }
         },
         {
-            "label": "Clean and Debug build for device",
+            "label": "Rebuild debug for device",
             "type": "shell",
             "command": "make clean disco DEBUG=1",
             "problemMatcher": [
@@ -74,7 +74,7 @@
             }
         },
         {
-            "label": "Clean and Release build for device STM32H7A3xxQ",
+            "label": "Rebuild for device STM32H7A3xxQ",
             "type": "shell",
             "command": "make clean disco BOARD=STM32H7A3xxQ",
             "problemMatcher": [
@@ -86,7 +86,7 @@
             }
         },
         {
-            "label": "Clean and Release build for device",
+            "label": "Rebuild for device",
             "type": "shell",
             "command": "make clean disco",
             "problemMatcher": [
