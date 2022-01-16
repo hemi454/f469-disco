@@ -43,7 +43,7 @@ STATIC void connection_ccid_transmit_raw_extended_apdu(usb_connection_obj_t* sel
                                          USBH_HandleTypeDef* phost,
                                          uint8_t* pbuff, uint32_t length);
 STATIC void  connection_ccid_receive_extended_apdu_first_block(usb_connection_obj_t* self);
-STATIC void connection_ccid_receive_extended_apdu_next_block(usb_connection_obj_t* self, uint8_t length, uint8_t offset);
+STATIC void connection_ccid_receive_extended_apdu_next_block(usb_connection_obj_t* self, uint32_t length, uint32_t offset);
 STATIC void connection_ccid_transmit_raw(usb_connection_obj_t* self,
                                          USBH_HandleTypeDef* phost,
                                          uint8_t* pbuff, uint32_t length);
@@ -739,7 +739,7 @@ send:
   if(receivedMessageLength > self->CCID_Handle->DataItf.InEpSize)
   {
     uint32_t remainingLength = receivedMessageLength - self->CCID_Handle->DataItf.InEpSize;
-    uint8_t offset = self->CCID_Handle->DataItf.InEpSize;
+    uint32_t offset = self->CCID_Handle->DataItf.InEpSize;
     while(1)
     {
       if(remainingLength <= self->CCID_Handle->DataItf.InEpSize)
@@ -753,7 +753,7 @@ send:
     }
   }
   t1_apdu_t apdu_received;
-  uint8_t dwLength = dw2i(hUsbHostFS.rawRxData, 1);
+  uint16_t dwLength = dw2i(hUsbHostFS.rawRxData, 1);
   if(hUsbHostFS.rawRxData[CCID_ICC_HEADER_LENGTH + dwLength - 2] == 0 || hUsbHostFS.rawRxData[CCID_ICC_HEADER_LENGTH + dwLength - 2] != 0x90)
   {
     messageLength = length + CCID_ICC_HEADER_LENGTH;
@@ -859,7 +859,7 @@ STATIC void connection_ccid_receive_extended_apdu_first_block(usb_connection_obj
   }
 }
 
-STATIC void connection_ccid_receive_extended_apdu_next_block(usb_connection_obj_t* self, uint8_t length, uint8_t offset)
+STATIC void connection_ccid_receive_extended_apdu_next_block(usb_connection_obj_t* self, uint32_t length, uint32_t offset)
 {
   uint32_t responseTimeout = 5000;
   while(1)
