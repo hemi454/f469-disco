@@ -680,14 +680,13 @@ STATIC void connection_ccid_transmit_xfr_block_extended_apdu(usb_connection_obj_
 STATIC void connection_ccid_exchange_raw_extended_apdu(usb_connection_obj_t* self,
                                          USBH_HandleTypeDef* phost,
                                          uint8_t* pbuff, uint32_t length) {
-  uint8_t offset = 0;
+  uint32_t offset = 0;
   uint32_t messageLength = length + CCID_ICC_HEADER_LENGTH;
   uint8_t cmd[CCID_ICC_HEADER_LENGTH + CCID_MAX_DATA_LENGTH] = {0};
   uint8_t counter = 0; 
   connection_prepare_xfrblock(self, pbuff, length, cmd, 0, 0);
   uint8_t delay = 2;
   uint8_t delay2 = 1;
-  uint8_t delay3 = 1;
 send:  
   if(messageLength > self->CCID_Handle->DataItf.InEpSize)
   {
@@ -725,7 +724,7 @@ send:
     messageLength = length + CCID_ICC_HEADER_LENGTH;
     offset = 0;
     counter++;
-    if(counter > 10)
+    if(counter > 15)
     {
       counter = 0;
       raise_SmartcardException("attempts counter is elapsed");
@@ -755,7 +754,7 @@ send:
   }
   t1_apdu_t apdu_received;
   uint8_t dwLength = dw2i(hUsbHostFS.rawRxData, 1);
-  if(hUsbHostFS.rawRxData[CCID_ICC_HEADER_LENGTH + dwLength -2] == 0)
+  if(hUsbHostFS.rawRxData[CCID_ICC_HEADER_LENGTH + dwLength - 2] == 0 || hUsbHostFS.rawRxData[CCID_ICC_HEADER_LENGTH + dwLength - 2] != 0x90)
   {
     messageLength = length + CCID_ICC_HEADER_LENGTH;
     offset = 0;
@@ -773,7 +772,7 @@ send:
   {
     raise_SmartcardException("APDU message is corrupted");
   }
-  mp_hal_delay_ms(25);
+  mp_hal_delay_ms(15);
   mp_obj_t response = make_response_list(hUsbHostFS.rawRxData + CCID_ICC_HEADER_LENGTH, dwLength);
   notify_observers_response(self, response);
   if (self->blocking) {
