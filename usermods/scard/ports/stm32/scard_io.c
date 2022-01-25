@@ -117,7 +117,7 @@ void scard_interface_print(const mp_print_t *print, scard_handle_t handle) {
  * @return          clock frequency in Hz
  */
 static inline uint32_t get_usart_clock(uint8_t usart_id) {
-#if defined(STM32F4)
+#if defined(STM32F4) || defined(STM32H7)
   if(usart_id == 1U || usart_id == 6U) { // USART1 & USART6 are connected APB2
     return HAL_RCC_GetPCLK2Freq();
   } else {                               // Other USARTs are connected APB1
@@ -135,7 +135,7 @@ static inline uint32_t get_usart_clock(uint8_t usart_id) {
  * @param mode    mode
  */
 static void set_usart_mode(scard_handle_t handle, usart_mode_t mode) {
-#if defined(STM32F4)
+#if defined(STM32F4) || defined(STM32H7)
   uint32_t irq_state = disable_irq();
   if(mode == usart_mode_tx) {
     handle->sc_handle.Instance->CR1 &= ~USART_CR1_RE;
@@ -156,7 +156,7 @@ static void set_usart_mode(scard_handle_t handle, usart_mode_t mode) {
  */
 static bool init_smartcard(SMARTCARD_HandleTypeDef* sc_handle,
                            USART_TypeDef* usart_handle, uint8_t usart_id) {
-#if defined(STM32F4)
+#if defined(STM32F4) || defined(STM32H7)
   // Calculate clock prescaler, programmed into USART_GTPR.PSC
   uint32_t clk_in = get_usart_clock(usart_id);
   uint32_t prescaler = (clk_in + 2U * SCARD_MAX_CLK_FREQUENCY_HZ - 1U) /
